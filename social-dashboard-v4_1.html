@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Social Dashboard v4</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&family=Press+Start+2P&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#030803;--surface:#061206;--card:#081808;--card2:#0c220c;
+  --border:rgba(0,255,65,0.18);--accent:#00ff41;--accent2:#39ff14;
+  --green:#00ff41;--red:#ff3333;--orange:#ffb000;--yellow:#ffb000;--cyan:#00ffcc;
+  --text:#00ff41;--muted:#1f8a3d;--radius:2px;--fb:#00ff41;--ig:#39ff14;
+  --glow:0 0 6px rgba(0,255,65,.55);
+}
+body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;animation:flicker 8s infinite}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:13px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;gap:12px}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px}
+.logo{font-family:'VT323';font-size:22px;color:var(--accent);text-shadow:var(--glow);white-space:nowrap}
+.logo .v{color:var(--muted);font-size:11px;font-family:'Share Tech Mono';text-shadow:none}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.t-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}.dot.err{background:var(--red)}
+.btn-xs{background:rgba(0,255,65,.12);border:1px solid rgba(0,255,65,.3);color:var(--accent);padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Share Tech Mono';white-space:nowrap}
+.btn-xs:hover{background:rgba(0,255,65,.25)}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 53px)}
+.sidebar{width:215px;min-width:215px;background:var(--surface);border-right:1px solid var(--border);padding:14px 8px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;overflow-x:hidden}
+.s-title{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);padding:6px 10px 10px;font-weight:600}
+.pg-btn{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;cursor:pointer;border:none;background:transparent;color:var(--text);font-family:'Share Tech Mono';font-size:13px;text-align:left;width:100%;transition:background .15s}
+.pg-btn:hover{background:rgba(255,255,255,.05)}
+.pg-btn.active{background:rgba(0,255,65,.15);color:#39ff14}
+.pg-icon{width:30px;height:30px;border-radius:50%;overflow:hidden;border:2px solid var(--border);flex-shrink:0;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:13px}
+.pg-icon img{width:100%;height:100%;object-fit:cover}
+.pg-info{overflow:hidden;min-width:0;flex:1}
+.pg-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-fans{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmp-btn{margin-top:auto;padding:9px;border-radius:10px;background:rgba(57,255,20,.1);border:1px solid rgba(57,255,20,.25);color:var(--accent2);font-family:'Share Tech Mono';font-size:12px;cursor:pointer;text-align:center;font-weight:500}
+.cmp-btn:hover{background:rgba(57,255,20,.2)}.cmp-btn.active{background:rgba(57,255,20,.25)}
+
+/* MAIN */
+.main{flex:1;padding:22px;overflow-y:auto;overflow-x:hidden;min-width:0}
+.main-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.main-title{font-family:'VT323';font-size:20px;font-weight:700;word-break:break-word}
+.main-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* VIEW TABS */
+.vtabs{display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:14px}
+.vtab{padding:7px 15px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted);font-family:'Share Tech Mono';font-size:12px;cursor:pointer;font-weight:500;transition:all .15s;white-space:nowrap}
+.vtab:hover{background:rgba(255,255,255,.04)}
+.vtab.active{background:rgba(0,255,65,.15);color:#39ff14;border-color:rgba(0,255,65,.3)}
+
+/* PLATFORM SUBTABS */
+.ptabs{display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap}
+.ptab{padding:5px 13px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Share Tech Mono';font-size:11px;cursor:pointer;font-weight:500}
+.ptab.fb{background:rgba(24,119,242,.15);color:var(--fb);border-color:rgba(24,119,242,.3)}
+.ptab.ig{background:rgba(225,48,108,.15);color:var(--ig);border-color:rgba(225,48,108,.3)}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:20px}
+.sc{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;min-width:0}
+.sc-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-val{font-family:'VT323';font-size:22px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-sub{font-size:10px;margin-top:3px}
+.sc-val.bl{color:#7aa2f7}.sc-val.pu{color:#bb9af7}.sc-val.gr{color:#9ece6a}.sc-val.or{color:var(--orange)}.sc-val.ye{color:var(--yellow)}.sc-val.cy{color:var(--cyan)}
+
+/* CARDS / CHARTS */
+.card-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:18px;overflow:hidden}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
+.card-title{font-family:'VT323';font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+canvas{display:block;max-width:100%}
+.chart-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* CONTROLS */
+.controls{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ctrl-btn{padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Share Tech Mono';font-size:11px;cursor:pointer;font-weight:500}
+.ctrl-btn:hover{background:rgba(255,255,255,.05)}
+.ctrl-btn.active{background:rgba(0,255,65,.15);color:#39ff14;border-color:rgba(0,255,65,.3)}
+.btn-export{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--green);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Share Tech Mono';font-weight:500}
+.btn-export:hover{background:rgba(34,197,94,.2)}
+.btn-report{background:rgba(247,201,72,.1);border:1px solid rgba(247,201,72,.25);color:var(--yellow);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Share Tech Mono';font-weight:500}
+.btn-report:hover{background:rgba(247,201,72,.2)}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:640px}
+th{background:var(--card2);padding:10px 12px;text-align:left;font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;white-space:nowrap;position:sticky;top:0;user-select:none}
+th:hover{color:var(--text)}
+th .arrow{font-size:9px;opacity:.6;margin-left:3px}
+td{padding:10px 12px;border-top:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.02)}
+.td-text{max-width:280px;color:#c0c0d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-num{font-family:'VT323';font-weight:700;text-align:center}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+.tag-foto{background:rgba(0,255,65,.15);color:#7aa2f7}
+.tag-video{background:rgba(225,48,108,.15);color:#ff7eb0}
+.tag-album{background:rgba(57,255,20,.15);color:#bb9af7}
+.tag-texto{background:rgba(107,107,133,.2);color:var(--muted)}
+.tag-link{background:rgba(52,211,153,.15);color:var(--cyan)}
+.paid-toggle{cursor:pointer;font-size:15px;background:none;border:none;padding:2px;transition:transform .15s}
+.paid-toggle:hover{transform:scale(1.2)}
+
+/* FORMAT BARS */
+.fmt-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.fmt-label{width:80px;font-size:12px;color:var(--muted);flex-shrink:0}
+.fmt-bar-wrap{flex:1;background:rgba(255,255,255,.05);border-radius:6px;height:26px;overflow:hidden;position:relative}
+.fmt-bar{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:11px;font-weight:600;color:#fff;transition:width .5s ease;min-width:40px}
+.fmt-count{font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0}
+
+/* HEATMAP */
+.heat-grid{display:grid;grid-template-columns:40px repeat(7,1fr);gap:3px;font-size:10px}
+.heat-corner{}
+.heat-daylbl{text-align:center;color:var(--muted);font-size:9px;padding:3px;text-transform:uppercase;font-weight:600}
+.heat-hrlbl{color:var(--muted);font-size:9px;text-align:right;padding-right:4px;display:flex;align-items:center;justify-content:flex-end}
+.heat-cell{aspect-ratio:1.6;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;cursor:default;transition:transform .1s}
+.heat-cell:hover{transform:scale(1.15);z-index:2}
+
+/* INSIGHT BOX */
+.insight{background:linear-gradient(135deg,rgba(247,201,72,.08),rgba(255,158,100,.05));border:1px solid rgba(247,201,72,.2);border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:13px;line-height:1.6;color:#e8e0c8}
+.insight strong{color:var(--yellow)}
+.insight .ico{font-size:16px;margin-right:6px}
+
+/* POSTS GRID */
+.posts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.post-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .2s,transform .2s;animation:fu .35s ease both;position:relative}
+.post-card:hover{border-color:rgba(0,255,65,.3);transform:translateY(-2px)}
+@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.p-img{width:100%;height:160px;object-fit:cover;display:block;background:#1a1a2e}
+.p-noimg{width:100%;height:80px;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:24px}
+.p-paid-badge{position:absolute;top:8px;right:8px;background:rgba(247,201,72,.9);color:#000;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;z-index:2}
+.p-body{padding:12px}
+.p-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:6px}
+.p-date{font-size:11px;color:var(--muted)}
+.p-text{font-size:12px;color:#c0c0d8;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px;word-break:break-word}
+.p-text.empty{color:var(--muted);font-style:italic}
+.p-metrics{display:grid;gap:4px;border-top:1px solid var(--border);padding-top:10px}
+.met{display:flex;flex-direction:column;align-items:center;gap:1px}
+.met-v{font-family:'VT323';font-size:13px;font-weight:700}
+.met-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+
+/* RANK */
+.rank-posts{display:flex;flex-direction:column;gap:8px}
+.rank-post{display:flex;align-items:center;gap:10px;background:var(--card2);border-radius:10px;padding:10px;border:1px solid var(--border)}
+.rank-thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#1a1a2e;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.rank-info{flex:1;min-width:0}
+.rank-text{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.rank-score{font-family:'VT323';font-size:15px;font-weight:700;flex-shrink:0}
+
+/* COMPARE PAGES */
+.cmp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:18px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center}
+.cmp-pic{width:48px;height:48px;border-radius:50%;margin:0 auto 10px;overflow:hidden;border:2px solid var(--border);display:flex;align-items:center;justify-content:center}
+.cmp-pic img{width:100%;height:100%;object-fit:cover}
+.cmp-name{font-family:'VT323';font-size:13px;font-weight:700;margin-bottom:3px;word-break:break-word}
+.cmp-fans{font-size:11px;color:var(--muted);margin-bottom:12px}
+.cmp-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.csv2{font-family:'VT323';font-size:18px;font-weight:700}
+.csl2{font-size:9px;color:var(--muted);text-transform:uppercase}
+
+/* MODALS */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}
+.modal{background:var(--surface);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:26px;width:460px;max-width:calc(100vw - 32px)}
+.modal h2{font-family:'VT323';font-size:17px;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+.modal label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.8px}
+.modal input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:12px;font-family:monospace;margin-bottom:12px;outline:none}
+.modal input:focus{border-color:var(--accent)}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px}
+.btn-p{background:var(--accent);color:#fff;border:none;padding:8px 18px;border-radius:10px;font-size:13px;font-family:'Share Tech Mono';cursor:pointer;font-weight:500}
+.btn-g{background:transparent;color:var(--muted);border:1px solid var(--border);padding:8px 14px;border-radius:10px;font-size:13px;font-family:'Share Tech Mono';cursor:pointer}
+.how-lnk{font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline;display:block;margin-bottom:12px}
+.instr{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px;line-height:1.7;display:none}
+.instr.show{display:block}.instr ol{padding-left:14px;color:var(--muted)}.instr a{color:var(--accent)}.instr strong{color:var(--text)}
+.rpt-modal{display:flex;flex-direction:column;max-height:80vh;width:600px}
+.rpt-text{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:12px;color:var(--text);font-family:monospace;line-height:1.6;overflow-y:auto;white-space:pre-wrap;min-height:200px;max-height:50vh}
+
+/* STATES */
+.state-box{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:60px 20px;color:var(--muted);text-align:center}
+.state-box .ico{font-size:42px}
+.state-box h3{font-family:'VT323';font-size:16px;color:var(--text)}
+.state-box p{font-size:12px;max-width:340px;line-height:1.5}
+.skel{background:rgba(255,255,255,.06);border-radius:8px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:3px}
+
+@media(max-width:900px){.stats-grid{grid-template-columns:repeat(2,1fr)}.sidebar{width:185px;min-width:185px}.chart-2col{grid-template-columns:1fr}}
+@media(max-width:700px){
+  .hamburger{display:block}
+  .sidebar{position:fixed;left:-250px;top:53px;bottom:0;width:240px;z-index:200;transition:left .25s ease}
+  .sidebar.open{left:0}
+  .s-overlay{position:fixed;inset:0;top:53px;background:rgba(0,0,0,.5);z-index:199;display:none}
+  .s-overlay.show{display:block}
+  .main{padding:14px}.stats-grid{grid-template-columns:repeat(2,1fr)}
+  .posts-grid{grid-template-columns:1fr}.topbar .t-status span{display:none}
+}
+
+/* ═══════ MATRIX CRT THEME ═══════ */
+@keyframes flicker{0%,96%,100%{opacity:1}97%{opacity:.92}98%{opacity:.97}99%{opacity:.95}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.12) 2px,rgba(0,0,0,.12) 4px)}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,10,0,.5) 100%)}
+.logo::after{content:'_';animation:blink 1s step-start infinite}
+.main-title,.sc-val,.csv2,.rank-score,.met-v{text-shadow:var(--glow)}
+.main-title{font-size:24px;text-transform:uppercase;letter-spacing:1px}
+.card-title,.sc-lbl,.s-title,.sec-title{letter-spacing:2px}
+.card-box,.sc,.post-card,.cmp-card,.rank-post,.modal,.tbl-wrap{box-shadow:inset 0 0 14px rgba(0,255,65,.04),0 0 8px rgba(0,255,65,.06)}
+.vtab,.ptab,.ctrl-btn,.btn-xs,.btn-p,.btn-g,.btn-export,.btn-report,.pg-btn,.cmp-btn,.paid-toggle{border-radius:0!important;text-transform:uppercase;letter-spacing:1px}
+.vtab.active{box-shadow:var(--glow);background:rgba(0,255,65,.12)!important;color:var(--accent)!important;border-color:var(--accent)!important}
+.vtab::before{content:'> ';opacity:0}
+.vtab.active::before{opacity:1}
+.btn-p{background:var(--accent);color:#021202;font-weight:700;text-shadow:none;box-shadow:var(--glow)}
+.btn-p:hover{background:var(--accent2)}
+.btn-xs,.ctrl-btn.active{color:var(--accent)!important;border-color:rgba(0,255,65,.4)!important;background:rgba(0,255,65,.08)!important}
+.btn-export{color:var(--accent)!important;border-color:rgba(0,255,65,.3)!important;background:rgba(0,255,65,.05)!important}
+.btn-report{color:var(--orange)!important;border-color:rgba(255,176,0,.4)!important;background:rgba(255,176,0,.06)!important}
+.sc-val.bl,.sc-val.pu,.sc-val.gr,.sc-val.cy,.csv2.bl,.csv2.pu,.csv2.gr{color:var(--accent)}
+.sc-val.or,.sc-val.ye,.csv2.ye{color:var(--orange);text-shadow:0 0 6px rgba(255,176,0,.5)}
+.tag{border-radius:0;border:1px solid currentColor;background:transparent!important}
+.tag-foto{color:#00ff41}.tag-video{color:#ffb000}.tag-album{color:#00ffcc}.tag-texto{color:#1f8a3d}.tag-link{color:#39ff14}
+th{background:var(--card2);color:var(--accent);border-bottom:1px solid var(--border)}
+td{border-top:1px solid rgba(0,255,65,.1)}
+tr:hover td{background:rgba(0,255,65,.04)}
+.td-text{color:#7fd99a}
+.p-text{color:#7fd99a}
+.insight{background:rgba(0,255,65,.05);border:1px solid rgba(0,255,65,.25);border-radius:0;color:#aaffc3}
+.insight strong{color:var(--accent);text-shadow:var(--glow)}
+.dot.ok{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.pg-btn.active{background:rgba(0,255,65,.1);color:var(--accent);box-shadow:inset 2px 0 0 var(--accent)}
+.pg-icon{border-radius:0;border-color:var(--border)}
+.cmp-pic{border-radius:0}
+.pg-icon img,.cmp-pic img,.p-img,.rank-thumb{filter:saturate(.4) sepia(.4) hue-rotate(70deg) brightness(.9)}
+.skel{background:rgba(0,255,65,.07)}
+.heat-cell{border-radius:0}
+.fmt-bar{border-radius:0;color:#021202;font-weight:700;text-shadow:none}
+.fmt-bar-wrap{border-radius:0;background:rgba(0,255,65,.05);border:1px solid rgba(0,255,65,.12)}
+.modal input{font-family:'Share Tech Mono';border-radius:0;caret-color:var(--accent)}
+.modal,.rpt-text{border-radius:0}
+.rpt-text{color:#7fd99a}
+.state-box h3{font-family:'VT323';font-size:22px;text-transform:uppercase;text-shadow:var(--glow)}
+::selection{background:var(--accent);color:#021202}
+::-webkit-scrollbar-thumb{background:#0f4d22}
+
+</style>
+</head>
+<body>
+<script>const SAVED_TOKEN='';</script>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="hamburger" onclick="toggleSB()">☰</button>
+    <div class="logo">social.dashboard <span class="v">v4</span></div>
+  </div>
+  <div class="topbar-right">
+    <div class="t-status"><div class="dot" id="sDot"></div><span id="sTxt">Sin token</span></div>
+    <button class="btn-xs" onclick="openTM()">🔑 Token</button>
+  </div>
+</div>
+
+<div class="s-overlay" id="sOv" onclick="toggleSB()"></div>
+<div class="layout">
+  <div class="sidebar" id="sidebar">
+    <div class="s-title">Mis Páginas</div>
+    <div id="pgList"><div class="skel" style="height:40px;border-radius:10px;margin-bottom:3px"></div><div class="skel" style="height:40px;border-radius:10px;margin-bottom:3px"></div><div class="skel" style="height:40px;border-radius:10px"></div></div>
+    <button class="cmp-btn" id="cmpBtn" onclick="showCompare()">📊 Comparar Todas</button>
+  </div>
+  <div class="main" id="main">
+    <div class="state-box" id="welcome">
+      <div class="ico">📊</div><h3>Social Dashboard v4</h3>
+      <p>Conecta tu cuenta de Meta para ver análisis profundo, comparar publicaciones, formatos, horarios y crecimiento.</p>
+      <button class="btn-p" onclick="openTM()">🔑 Conectar</button>
+    </div>
+    <div id="pgContent" style="display:none"></div>
+  </div>
+</div>
+
+<div class="ov" id="tkModal" style="display:none">
+  <div class="modal">
+    <h2>🔑 Token de Acceso</h2>
+    <p>Permisos: <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>pages_read_user_content</code>, <code>read_insights</code></p>
+    <a class="how-lnk" onclick="document.getElementById('instr').classList.toggle('show')">¿Cómo? →</a>
+    <div class="instr" id="instr"><ol><li>Ve a <a href="https://developers.facebook.com/tools/explorer/" target="_blank"><strong>Graph API Explorer</strong></a></li><li>Selecciona tu app</li><li><strong>Generate Access Token</strong> con los 4 permisos</li><li>Copia y pega abajo</li></ol></div>
+    <label>Access Token</label>
+    <input type="text" id="tkInput" placeholder="EAA4ZCs0dXoJ4..."/>
+    <div class="modal-foot"><button class="btn-g" onclick="closeTM()">Cancelar</button><button class="btn-p" onclick="saveTK()">Conectar →</button></div>
+  </div>
+</div>
+
+<div class="ov" id="rptModal" style="display:none">
+  <div class="modal rpt-modal">
+    <h2>📋 Reporte para Claude</h2>
+    <p>Copia y pega en el chat para análisis con la skill de social media.</p>
+    <div class="rpt-text" id="rptText"></div>
+    <div class="modal-foot" style="margin-top:14px"><button class="btn-g" onclick="document.getElementById('rptModal').style.display='none'">Cerrar</button><button class="btn-p" onclick="copyReport()">📋 Copiar</button></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  SOCIAL DASHBOARD v4 — Angel Ortega
+//  Meta Graph API v25.0 | Multi-view analytics
+// ═══════════════════════════════════════════════════
+const API='https://graph.facebook.com/v25.0';
+const DAYS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+let TOKEN='', pages=[], currentPage=null, currentView='resumen', currentPlatform='facebook';
+let cache={};                    // {pageId: {posts, fans, platform}}
+let sortState={col:'eng',dir:'desc'};
+let compareFilter='todos';       // todos | organico | pagado
+
+// ── localStorage helpers ──
+const LS={
+  paid:JSON.parse(localStorage.getItem('sd_paid')||'{}'),       // {postId:true}
+  snaps:JSON.parse(localStorage.getItem('sd_snaps')||'{}'),     // {pageId:[{date,fans,avgEng}]}
+  save(){ localStorage.setItem('sd_paid',JSON.stringify(this.paid)); localStorage.setItem('sd_snaps',JSON.stringify(this.snaps)); }
+};
+
+window.addEventListener('DOMContentLoaded',()=>{
+  TOKEN=SAVED_TOKEN||localStorage.getItem('meta_token')||'';
+  if(TOKEN) init(); else openTM();
+});
+
+async function init(){
+  setStatus('loading');
+  try{ await loadPages(); setStatus('ok','Conectado'); }
+  catch(e){ setStatus('err','Token inválido'); welcomeErr(e.message); }
+}
+
+// ── Pages ──
+async function loadPages(){
+  const r=await api('/me/accounts?fields=id,name,access_token,fan_count,followers_count,picture,instagram_business_account&limit=25');
+  if(!r.data?.length) throw new Error('No se encontraron páginas.');
+  pages=r.data; window._pt={};
+  pages.forEach(p=>{ window._pt[p.id]=p.access_token; });
+  renderSidebar();
+  selectPage(pages[0].id);
+}
+
+function renderSidebar(){
+  document.getElementById('pgList').innerHTML=pages.map((p,i)=>{
+    const pic=p.picture?.data?.url||'';
+    return `<button class="pg-btn${i===0?' active':''}" id="b-${p.id}" onclick="selectPage('${p.id}',this)">
+      <div class="pg-icon">${pic?`<img src="${pic}"/>`:(p.name[0]||'?')}</div>
+      <div class="pg-info"><div class="pg-name">${esc(p.name)}</div>
+      <div class="pg-fans">${fmt(p.fan_count||p.followers_count||0)} seg.${p.instagram_business_account?' 📸':''}</div></div></button>`;
+  }).join('');
+}
+
+function selectPage(id, btn){
+  const page=pages.find(p=>p.id===id); if(!page) return;
+  document.querySelectorAll('.pg-btn').forEach(b=>b.classList.remove('active'));
+  (btn||document.getElementById(`b-${id}`))?.classList.add('active');
+  document.getElementById('cmpBtn').classList.remove('active');
+  currentPage=page; currentView='resumen'; currentPlatform='facebook'; closeSB();
+  renderShell(page);
+  loadPageData(page.id).then(()=>renderView()).catch(e=>{ document.getElementById('viewBody').innerHTML=`<div class="state-box"><div class="ico">⚠️</div><h3>Error</h3><p>${esc(e.message)}</p></div>`; });
+}
+
+// ── Shell with view tabs ──
+function renderShell(page){
+  const c=document.getElementById('pgContent');
+  document.getElementById('welcome').style.display='none';
+  c.style.display='block';
+  c.innerHTML=`
+    <div class="main-header"><div><div class="main-title">${esc(page.name)}</div><div class="main-sub" id="subLine">Cargando datos...</div></div></div>
+    <div class="vtabs">
+      <button class="vtab active" data-v="resumen" onclick="setView('resumen')">📊 Resumen</button>
+      <button class="vtab" data-v="comparar" onclick="setView('comparar')">📈 Comparar Posts</button>
+      <button class="vtab" data-v="formatos" onclick="setView('formatos')">🎬 Formatos y Horarios</button>
+      <button class="vtab" data-v="analisis" onclick="setView('analisis')">🧠 Análisis</button>
+    </div>
+    <div id="viewBody"><div class="stats-grid">${sk(4,70)}</div><div class="card-box"><div class="skel" style="height:200px;border-radius:10px"></div></div></div>`;
+}
+
+function setView(v){
+  currentView=v;
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
+  renderView();
+}
+
+// ── Load data (FB + insights) ──
+async function loadPageData(pageId){
+  if(cache[pageId]) return;
+  const t=window._pt[pageId]||TOKEN;
+  const [pr,pi]=await Promise.all([
+    api(`/${pageId}/posts?fields=id,message,created_time,full_picture,status_type,attachments{media_type,type},likes.summary(true),comments.summary(true),shares&limit=30`,t),
+    api(`/${pageId}?fields=fan_count,followers_count`,t)
+  ]);
+  const posts=pr.data||[];
+  const ins=await batchInsights(posts.map(p=>p.id),['post_impressions','post_impressions_unique','post_clicks'],t);
+  const vidPosts=posts.filter(p=>getFormat(p)==='Video');
+  let vidViews={};
+  if(vidPosts.length){
+    const vi=await batchInsights(vidPosts.map(p=>p.id),['post_video_views'],t);
+    vidPosts.forEach((p,i)=>{ vidViews[p.id]=vi[i]?.post_video_views||0; });
+  }
+  posts.forEach((p,i)=>{
+    p._ins=ins[i]||{};
+    p._reach=p._ins.post_impressions_unique||0;
+    p._impr=p._ins.post_impressions||0;
+    p._clicks=p._ins.post_clicks||0;
+    p._vviews=vidViews[p.id]||0;
+    p._fmt=getFormat(p);
+    p._likes=p.likes?.summary?.total_count||0;
+    p._comments=p.comments?.summary?.total_count||0;
+    p._shares=p.shares?.count||0;
+    p._eng=p._likes+p._comments+p._shares;
+    p._dt=new Date(p.created_time);
+    p._paid=!!LS.paid[p.id];
+  });
+  const fans=pi.fan_count||pi.followers_count||0;
+  cache[pageId]={posts,fans,platform:'facebook'};
+  recordSnapshot(pageId,fans,posts);
+}
+
+function getFormat(p){
+  const st=p.status_type, att=p.attachments?.data?.[0];
+  const mt=att?.media_type||att?.type;
+  if(st==='added_video'||mt==='video') return 'Video';
+  if(mt==='album'||att?.type==='album') return 'Álbum';
+  if(st==='added_photos'||mt==='photo') return 'Foto';
+  if(mt==='share'||st==='shared_story') return 'Link';
+  if(p.full_picture) return 'Foto';
+  return 'Texto';
+}
+
+// ── Snapshots ──
+function recordSnapshot(pageId,fans,posts){
+  const today=new Date().toISOString().slice(0,10);
+  if(!LS.snaps[pageId]) LS.snaps[pageId]=[];
+  const arr=LS.snaps[pageId];
+  const avgEng=posts.length?Math.round(posts.reduce((s,p)=>s+p._eng,0)/posts.length):0;
+  const existing=arr.find(s=>s.date===today);
+  if(existing){ existing.fans=fans; existing.avgEng=avgEng; }
+  else arr.push({date:today,fans,avgEng});
+  if(arr.length>180) LS.snaps[pageId]=arr.slice(-180);
+  LS.save();
+}
+
+// ── VIEW ROUTER ──
+function renderView(){
+  const data=cache[currentPage.id];
+  if(!data){ document.getElementById('viewBody').innerHTML=`<div class="state-box"><div class="ico">⚠️</div><h3>Sin datos</h3></div>`; return; }
+  document.getElementById('subLine').textContent=`${data.posts.length} posts · ${fmt(data.fans)} seguidores`;
+  if(currentView==='resumen') viewResumen(data);
+  else if(currentView==='comparar') viewComparar(data);
+  else if(currentView==='formatos') viewFormatos(data);
+  else if(currentView==='analisis') viewAnalisis(data);
+}
+
+// ════════ VIEW: RESUMEN ════════
+function viewResumen(data){
+  const {posts,fans}=data;
+  const org=posts.filter(p=>!p._paid);
+  const avgEng=avg(posts.map(p=>p._eng));
+  const avgEngOrg=avg(org.map(p=>p._eng));
+  const avgReach=avg(posts.map(p=>p._reach));
+  const er=avgReach>0?((avgEng/avgReach)*100).toFixed(1)+'%':'—';
+  document.getElementById('viewBody').innerHTML=`
+    <div class="stats-grid">
+      <div class="sc"><div class="sc-lbl">Seguidores</div><div class="sc-val bl">${fmt(fans)}</div></div>
+      <div class="sc"><div class="sc-lbl">Eng. Promedio</div><div class="sc-val gr">${fmt(Math.round(avgEng))}</div><div class="sc-sub" style="color:var(--muted)">Orgánico: ${fmt(Math.round(avgEngOrg))}</div></div>
+      <div class="sc"><div class="sc-lbl">Eng. Rate</div><div class="sc-val ye">${er}</div></div>
+      <div class="sc"><div class="sc-lbl">Posts pagados</div><div class="sc-val or">${posts.filter(p=>p._paid).length}/${posts.length}</div></div>
+    </div>
+    <div class="chart-2col">
+      <div class="card-box"><div class="card-hdr"><div class="card-title">Engagement en el Tiempo</div></div><canvas id="cTime"></canvas></div>
+      <div class="card-box"><div class="card-hdr"><div class="card-title">Crecimiento de Seguidores</div></div><div id="growthArea"></div></div>
+    </div>`;
+  drawTimeline(posts,'cTime');
+  drawGrowth(currentPage.id);
+}
+
+function drawGrowth(pageId){
+  const snaps=LS.snaps[pageId]||[];
+  const area=document.getElementById('growthArea');
+  if(snaps.length<2){
+    area.innerHTML=`<div style="padding:30px 10px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6">
+      📅 Aún no hay histórico suficiente.<br>El dashboard guarda los números cada día que lo abres.<br>
+      <strong style="color:var(--text)">Snapshot de hoy guardado.</strong><br>Vuelve mañana para ver la primera línea de tendencia.</div>`;
+    return;
+  }
+  area.innerHTML=`<canvas id="cGrowth"></canvas>`;
+  const c=document.getElementById('cGrowth');
+  const W=c.parentElement.clientWidth,H=180; setupCanvas(c,W,H);
+  const ctx=c.getContext('2d');
+  lineChart(ctx,W,H,snaps.map(s=>s.fans),snaps.map(s=>s.date.slice(5)),'#00ff41',true);
+}
+
+// ════════ VIEW: COMPARAR ════════
+function viewComparar(data){
+  const posts=getFiltered(data.posts);
+  document.getElementById('viewBody').innerHTML=`
+    <div class="card-box">
+      <div class="card-hdr">
+        <div class="card-title">Comparativa de Publicaciones</div>
+        <div class="controls">
+          <button class="ctrl-btn ${compareFilter==='todos'?'active':''}" onclick="setFilter('todos')">Todos</button>
+          <button class="ctrl-btn ${compareFilter==='organico'?'active':''}" onclick="setFilter('organico')">🟢 Orgánico</button>
+          <button class="ctrl-btn ${compareFilter==='pagado'?'active':''}" onclick="setFilter('pagado')">💰 Pagado</button>
+          <button class="btn-export" onclick="exportCSV('${currentPage.id}')">📥 CSV</button>
+        </div>
+      </div>
+      <canvas id="cBars"></canvas>
+    </div>
+    <div class="card-box">
+      <div class="card-hdr"><div class="card-title">Tabla Comparativa — clic en encabezado para ordenar</div></div>
+      <div class="tbl-wrap" id="tblWrap"></div>
+    </div>`;
+  drawBars(posts,'cBars');
+  renderTable(posts);
+}
+
+function getFiltered(posts){
+  if(compareFilter==='organico') return posts.filter(p=>!p._paid);
+  if(compareFilter==='pagado') return posts.filter(p=>p._paid);
+  return posts;
+}
+function setFilter(f){ compareFilter=f; renderView(); }
+
+function renderTable(posts){
+  const sorted=sortPosts(posts);
+  const arrow=c=>sortState.col===c?`<span class="arrow">${sortState.dir==='desc'?'▼':'▲'}</span>`:'';
+  const rows=sorted.map(p=>{
+    const fmtTag=`tag-${p._fmt.toLowerCase().replace('á','a')}`;
+    return `<tr>
+      <td><button class="paid-toggle" onclick="togglePaid('${p.id}')" title="Marcar pagado/orgánico">${p._paid?'💰':'🟢'}</button></td>
+      <td style="white-space:nowrap;color:var(--muted)">${fmtDate(p.created_time)}</td>
+      <td><span class="tag ${fmtTag}">${p._fmt}</span></td>
+      <td class="td-text">${esc(p.message||'Sin texto')}</td>
+      <td class="td-num">${p._likes}</td>
+      <td class="td-num">${p._comments}</td>
+      <td class="td-num">${p._shares}</td>
+      <td class="td-num" style="color:var(--green)">${p._eng}</td>
+      <td class="td-num" style="color:var(--yellow)">${p._reach>0?fmt(p._reach):'—'}</td>
+      <td class="td-num" style="color:#ff7eb0">${p._fmt==='Video'&&p._vviews>0?fmt(p._vviews):'—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tblWrap').innerHTML=`<table>
+    <thead><tr>
+      <th></th>
+      <th onclick="sortBy('date')">Fecha${arrow('date')}</th>
+      <th onclick="sortBy('fmt')">Formato${arrow('fmt')}</th>
+      <th>Texto</th>
+      <th onclick="sortBy('likes')">❤️${arrow('likes')}</th>
+      <th onclick="sortBy('comments')">💬${arrow('comments')}</th>
+      <th onclick="sortBy('shares')">🔁${arrow('shares')}</th>
+      <th onclick="sortBy('eng')">Total${arrow('eng')}</th>
+      <th onclick="sortBy('reach')">Alcance${arrow('reach')}</th>
+      <th onclick="sortBy('vviews')">▶ Views${arrow('vviews')}</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function sortBy(col){
+  if(sortState.col===col) sortState.dir=sortState.dir==='desc'?'asc':'desc';
+  else { sortState.col=col; sortState.dir='desc'; }
+  renderView();
+}
+function sortPosts(posts){
+  const k={date:'_dt',fmt:'_fmt',likes:'_likes',comments:'_comments',shares:'_shares',eng:'_eng',reach:'_reach',vviews:'_vviews'}[sortState.col];
+  return [...posts].sort((a,b)=>{
+    let va=a[k],vb=b[k];
+    if(k==='_fmt'){ va=va||''; vb=vb||''; return sortState.dir==='desc'?vb.localeCompare(va):va.localeCompare(vb); }
+    return sortState.dir==='desc'?vb-va:va-vb;
+  });
+}
+function togglePaid(id){
+  LS.paid[id]=!LS.paid[id];
+  if(!LS.paid[id]) delete LS.paid[id];
+  LS.save();
+  Object.values(cache).forEach(d=>d.posts?.forEach(p=>{ if(p.id===id) p._paid=!!LS.paid[id]; }));
+  renderView();
+}
+
+// ════════ VIEW: FORMATOS Y HORARIOS ════════
+function viewFormatos(data){
+  const posts=data.posts;
+  const fmts={};
+  posts.forEach(p=>{ if(!fmts[p._fmt]) fmts[p._fmt]={n:0,eng:0}; fmts[p._fmt].n++; fmts[p._fmt].eng+=p._eng; });
+  const fmtArr=Object.entries(fmts).map(([k,v])=>({fmt:k,n:v.n,avg:Math.round(v.eng/v.n)})).sort((a,b)=>b.avg-a.avg);
+  const maxFmt=Math.max(...fmtArr.map(f=>f.avg),1);
+  const fmtColors={'Video':'var(--ig)','Foto':'var(--accent)','Álbum':'var(--accent2)','Texto':'var(--muted)','Link':'var(--cyan)'};
+  const fmtBars=fmtArr.map(f=>`<div class="fmt-row">
+    <div class="fmt-label">${f.fmt}</div>
+    <div class="fmt-bar-wrap"><div class="fmt-bar" style="width:${Math.max(8,(f.avg/maxFmt)*100)}%;background:${fmtColors[f.fmt]||'var(--accent)'}">${f.avg}</div></div>
+    <div class="fmt-count">${f.n} posts</div></div>`).join('');
+
+  let fmtInsight='';
+  if(fmtArr.length>=2){
+    const best=fmtArr[0], worst=fmtArr[fmtArr.length-1];
+    if(worst.avg>0){
+      const x=(best.avg/worst.avg).toFixed(1);
+      fmtInsight=`<div class="insight"><span class="ico">💡</span>Tus posts de <strong>${best.fmt}</strong> rinden <strong>${x}x más</strong> engagement que los de ${worst.fmt}. Conviene hacer más ${best.fmt}.</div>`;
+    }
+  }
+
+  const heat={}; let maxHeat=0;
+  posts.forEach(p=>{ const d=p._dt.getDay(), h=p._dt.getHours(); const k=`${d}-${h}`; heat[k]=(heat[k]||0)+p._eng; if(heat[k]>maxHeat)maxHeat=heat[k]; });
+  const hoursUsed=[...new Set(posts.map(p=>p._dt.getHours()))].sort((a,b)=>a-b);
+  let heatHtml=`<div class="heat-grid"><div class="heat-corner"></div>`;
+  DAYS.forEach(d=>heatHtml+=`<div class="heat-daylbl">${d}</div>`);
+  hoursUsed.forEach(h=>{
+    heatHtml+=`<div class="heat-hrlbl">${h}:00</div>`;
+    for(let d=0;d<7;d++){
+      const v=heat[`${d}-${h}`]||0;
+      const intensity=maxHeat>0?v/maxHeat:0;
+      const bg=v>0?`rgba(0,255,65,${0.12+intensity*0.88})`:'rgba(0,255,65,0.04)';
+      heatHtml+=`<div class="heat-cell" style="background:${bg}" title="${DAYS[d]} ${h}:00 — ${v} eng">${v>0?v:''}</div>`;
+    }
+  });
+  heatHtml+=`</div>`;
+
+  let bestSlot='',bestVal=0;
+  Object.entries(heat).forEach(([k,v])=>{ if(v>bestVal){bestVal=v;bestSlot=k;} });
+  const [bd,bh]=bestSlot?bestSlot.split('-'):['',''];
+
+  const lenBuckets={'Corto (<100)':{n:0,eng:0},'Medio (100-300)':{n:0,eng:0},'Largo (>300)':{n:0,eng:0}};
+  posts.forEach(p=>{ const l=(p.message||'').length; const b=l<100?'Corto (<100)':l<=300?'Medio (100-300)':'Largo (>300)'; lenBuckets[b].n++; lenBuckets[b].eng+=p._eng; });
+  const lenArr=Object.entries(lenBuckets).filter(([k,v])=>v.n>0).map(([k,v])=>({k,n:v.n,avg:Math.round(v.eng/v.n)}));
+  const maxLen=Math.max(...lenArr.map(l=>l.avg),1);
+  const lenBars=lenArr.map(l=>`<div class="fmt-row"><div class="fmt-label" style="width:120px">${l.k}</div><div class="fmt-bar-wrap"><div class="fmt-bar" style="width:${Math.max(8,(l.avg/maxLen)*100)}%;background:var(--orange)">${l.avg}</div></div><div class="fmt-count">${l.n}</div></div>`).join('');
+
+  const withQ=posts.filter(p=>(p.message||'').includes('?')), noQ=posts.filter(p=>!(p.message||'').includes('?'));
+  const qAvg=avg(withQ.map(p=>p._eng)).toFixed(0), nqAvg=avg(noQ.map(p=>p._eng)).toFixed(0);
+
+  document.getElementById('viewBody').innerHTML=`
+    ${fmtInsight}
+    <div class="chart-2col">
+      <div class="card-box"><div class="card-hdr"><div class="card-title">Engagement por Formato</div></div>${fmtBars||'<p style="color:var(--muted);font-size:12px">Sin datos</p>'}</div>
+      <div class="card-box"><div class="card-hdr"><div class="card-title">Largo de Texto vs Engagement</div></div>${lenBars||'<p style="color:var(--muted);font-size:12px">Sin datos</p>'}</div>
+    </div>
+    <div class="card-box">
+      <div class="card-hdr"><div class="card-title">Mapa de Calor — Día × Hora</div></div>
+      ${bestSlot?`<div class="insight" style="margin-bottom:14px"><span class="ico">🕐</span>Tu mejor momento histórico: <strong>${DAYS[bd]} a las ${bh}:00</strong> (${bestVal} engagement acumulado).</div>`:''}
+      ${heatHtml}
+    </div>
+    <div class="card-box">
+      <div class="card-hdr"><div class="card-title">¿Las preguntas funcionan?</div></div>
+      <div style="display:flex;gap:30px;flex-wrap:wrap">
+        <div><div class="sc-lbl">Posts CON pregunta</div><div class="sc-val gr" style="font-size:26px">${qAvg}</div><div class="sc-sub" style="color:var(--muted)">${withQ.length} posts · eng promedio</div></div>
+        <div><div class="sc-lbl">Posts SIN pregunta</div><div class="sc-val or" style="font-size:26px">${nqAvg}</div><div class="sc-sub" style="color:var(--muted)">${noQ.length} posts · eng promedio</div></div>
+      </div>
+    </div>`;
+}
+
+// ════════ VIEW: ANÁLISIS ════════
+function viewAnalisis(data){
+  const {posts,fans}=data;
+  const org=posts.filter(p=>!p._paid);
+  posts.forEach(p=>{ const base=p._reach>0?p._reach:fans; p._er=base>0?(p._eng/base*100):0; p._score=Math.min(10,parseFloat((p._er*2).toFixed(1))); });
+  const src=org.length?org:posts;
+  const ranked=[...src].sort((a,b)=>b._er-a._er);
+  const top3=ranked.slice(0,3), bot3=ranked.slice(-3).reverse();
+
+  const dayEng=[0,0,0,0,0,0,0],dayCnt=[0,0,0,0,0,0,0];
+  src.forEach(p=>{ const d=p._dt.getDay(); dayEng[d]+=p._eng; dayCnt[d]++; });
+  const dayAvg=dayEng.map((v,i)=>dayCnt[i]?Math.round(v/dayCnt[i]):0);
+  const bestDay=dayAvg.indexOf(Math.max(...dayAvg));
+
+  const sortedOrg=[...src].sort((a,b)=>b._dt-a._dt);
+  const last5=avg(sortedOrg.slice(0,5).map(p=>p._eng)), prev5=avg(sortedOrg.slice(5,10).map(p=>p._eng));
+  const trend=prev5>0?Math.round((last5-prev5)/prev5*100):0;
+
+  const rankHtml=(list,color)=>list.map(p=>{
+    const img=p.full_picture||'';
+    return `<div class="rank-post">
+      ${img?`<img class="rank-thumb" src="${img}" onerror="this.parentElement.innerHTML='📝'"/>`:'<div class="rank-thumb">📝</div>'}
+      <div class="rank-info"><div class="rank-text">${esc(p.message?.slice(0,45)||'Sin texto')}</div>
+      <div class="rank-meta">${fmtDate(p.created_time)} · ${p._fmt} · Eng: ${p._eng}${p._paid?' · 💰':''}</div></div>
+      <div class="rank-score" style="color:${color}">${p._score}/10</div></div>`;
+  }).join('');
+
+  document.getElementById('viewBody').innerHTML=`
+    <div class="card-hdr" style="margin-bottom:14px">
+      <div class="card-title">Análisis de Rendimiento (orgánico)</div>
+      <button class="btn-report" onclick="genReport('${currentPage.id}')">📋 Generar Reporte para Claude</button>
+    </div>
+    <div class="chart-2col">
+      <div class="card-box"><div class="card-hdr"><div class="card-title">🏆 Top 3 (orgánico)</div></div><div class="rank-posts">${rankHtml(top3,'var(--green)')||'Sin datos'}</div></div>
+      <div class="card-box"><div class="card-hdr"><div class="card-title">📉 Necesitan mejora</div></div><div class="rank-posts">${rankHtml(bot3,'var(--red)')||'Sin datos'}</div></div>
+    </div>
+    <div class="card-box">
+      <div class="card-hdr"><div class="card-title">Resumen</div></div>
+      <div class="stats-grid">
+        <div class="sc"><div class="sc-lbl">ER Orgánico</div><div class="sc-val ye">${avg(org.map(p=>p._er)).toFixed(2)}%</div></div>
+        <div class="sc"><div class="sc-lbl">Tendencia (5 vs 5)</div><div class="sc-val ${trend>=0?'gr':'or'}">${trend>=0?'▲ +':'▼ '}${trend}%</div></div>
+        <div class="sc"><div class="sc-lbl">Mejor día</div><div class="sc-val bl">${DAYS[bestDay]}</div></div>
+        <div class="sc"><div class="sc-lbl">Posts orgánicos</div><div class="sc-val pu">${org.length}/${posts.length}</div></div>
+      </div>
+    </div>`;
+}
+
+// ════════ COMPARE PAGES ════════
+async function showCompare(){
+  document.querySelectorAll('.pg-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('cmpBtn').classList.add('active'); closeSB();
+  const c=document.getElementById('pgContent');
+  document.getElementById('welcome').style.display='none'; c.style.display='block';
+  c.innerHTML=`<div class="main-header"><div><div class="main-title">Comparar Todas</div><div class="main-sub">Vista general de tus negocios</div></div></div>
+    <div class="cmp-grid" id="cGrid">${sk(pages.length,180)}</div>
+    <div class="card-box"><div class="card-hdr"><div class="card-title">Engagement Promedio por Página</div></div><canvas id="cmpBars"></canvas></div>`;
+  const results=await Promise.allSettled(pages.map(async p=>{
+    const t=window._pt[p.id]||TOKEN;
+    try{
+      const r=await api(`/${p.id}/posts?fields=id,likes.summary(true),comments.summary(true),shares&limit=15`,t);
+      const posts=r.data||[];
+      const eng=posts.map(x=>(x.likes?.summary?.total_count||0)+(x.comments?.summary?.total_count||0)+(x.shares?.count||0));
+      return{...p,avgEng:Math.round(avg(eng)),n:posts.length};
+    }catch{return{...p,avgEng:0,n:0};}
+  }));
+  const vals=results.map(r=>r.value);
+  document.getElementById('cGrid').innerHTML=vals.map(p=>{
+    const pic=p.picture?.data?.url||''; const fans=p.fan_count||p.followers_count||0;
+    return `<div class="cmp-card"><div class="cmp-pic">${pic?`<img src="${pic}"/>`:'👤'}</div>
+      <div class="cmp-name">${esc(p.name)}</div><div class="cmp-fans">${fmt(fans)} seg.${p.instagram_business_account?' · 📸':''}</div>
+      <div class="cmp-stats">
+        <div><div class="csv2 bl">${fmt(fans)}</div><div class="csl2">Seguidores</div></div>
+        <div><div class="csv2 pu">${p.n}</div><div class="csl2">Posts</div></div>
+        <div><div class="csv2 gr">${fmt(p.avgEng)}</div><div class="csl2">Avg Eng</div></div>
+        <div><div class="csv2 ye">${fans>0?((p.avgEng/fans)*100).toFixed(1)+'%':'—'}</div><div class="csl2">ER Est.</div></div>
+      </div></div>`;
+  }).join('');
+  const c2=document.getElementById('cmpBars');
+  const W=c2.parentElement.clientWidth-36,H=200; setupCanvas(c2,W,H);
+  barChartLabeled(c2.getContext('2d'),W,H,vals.map(p=>p.avgEng),vals.map(p=>p.name.slice(0,12)),'#00ff41');
+}
+
+// ════════ CHARTS ════════
+function setupCanvas(c,W,H){ const dpr=window.devicePixelRatio||1; c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px'; c.getContext('2d').scale(dpr,dpr); }
+
+function drawTimeline(posts,id){
+  const c=document.getElementById(id); if(!c)return;
+  const W=c.parentElement.clientWidth-36,H=200; setupCanvas(c,W,H);
+  const sorted=[...posts].sort((a,b)=>a._dt-b._dt);
+  barChartLabeled(c.getContext('2d'),W,H,sorted.map(p=>p._eng),sorted.map(p=>`${p._dt.getDate()}/${p._dt.getMonth()+1}`),'#00ff41',sorted.map(p=>p._paid));
+}
+
+function drawBars(posts,id){
+  const c=document.getElementById(id); if(!c)return;
+  const sorted=sortPosts(posts);
+  const W=c.parentElement.clientWidth-36,H=220; setupCanvas(c,W,H);
+  barChartLabeled(c.getContext('2d'),W,H,sorted.map(p=>p._eng),sorted.map(p=>`${p._dt.getDate()}/${p._dt.getMonth()+1}`),'#00ff41',sorted.map(p=>p._paid));
+}
+
+function barChartLabeled(ctx,W,H,data,labels,color,paidArr){
+  const pad={t:12,b:30,l:38,r:8},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+  const max=Math.max(...data,1);
+  const bW=Math.max(4,Math.min(26,cW/data.length-3)),gap=cW/data.length;
+  ctx.clearRect(0,0,W,H);
+  for(let i=0;i<=4;i++){const y=pad.t+(cH/4)*i;ctx.strokeStyle='rgba(0,255,65,0.08)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillStyle='#1f8a3d';ctx.font='9px Share Tech Mono';ctx.textAlign='right';ctx.fillText(fmt(Math.round(max*(1-i/4))),pad.l-4,y+3);}
+  data.forEach((v,i)=>{
+    const x=pad.l+i*gap+(gap-bW)/2,h=(v/max)*cH,y=pad.t+cH-h;
+    const isPaid=Array.isArray(paidArr)&&paidArr[i];
+    ctx.fillStyle=isPaid?'#ffb000':color; ctx.globalAlpha=.85;
+    const r=Math.min(3,bW/2);
+    ctx.beginPath();ctx.moveTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.arcTo(x+bW,y,x+bW,y+r,r);ctx.lineTo(x+bW,pad.t+cH);ctx.lineTo(x,pad.t+cH);ctx.closePath();ctx.fill();
+    ctx.globalAlpha=1;
+    if(data.length<=18||i%Math.ceil(data.length/12)===0){ctx.fillStyle='#1f8a3d';ctx.font='8px Share Tech Mono';ctx.textAlign='center';ctx.fillText(labels[i],x+bW/2,H-4);}
+  });
+  if(Array.isArray(paidArr)){ctx.fillStyle='#ffb000';ctx.fillRect(W-pad.r-70,pad.t,8,8);ctx.fillStyle='#1f8a3d';ctx.font='9px Share Tech Mono';ctx.textAlign='left';ctx.fillText('= pagado',W-pad.r-58,pad.t+8);}
+}
+
+function lineChart(ctx,W,H,data,labels,color,fill){
+  const pad={t:12,b:28,l:42,r:10},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+  const max=Math.max(...data),min=Math.min(...data),range=max-min||1;
+  ctx.clearRect(0,0,W,H);
+  for(let i=0;i<=4;i++){const y=pad.t+(cH/4)*i;ctx.strokeStyle='rgba(0,255,65,0.08)';ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillStyle='#1f8a3d';ctx.font='9px Share Tech Mono';ctx.textAlign='right';ctx.fillText(fmt(Math.round(max-(range*i/4))),pad.l-4,y+3);}
+  const px=i=>pad.l+(cW/(data.length-1||1))*i, py=v=>pad.t+cH-((v-min)/range)*cH;
+  if(fill){ctx.beginPath();ctx.moveTo(px(0),pad.t+cH);data.forEach((v,i)=>ctx.lineTo(px(i),py(v)));ctx.lineTo(px(data.length-1),pad.t+cH);ctx.closePath();const g=ctx.createLinearGradient(0,pad.t,0,pad.t+cH);g.addColorStop(0,'rgba(0,255,65,0.25)');g.addColorStop(1,'rgba(0,255,65,0)');ctx.fillStyle=g;ctx.fill();}
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();data.forEach((v,i)=>{i===0?ctx.moveTo(px(i),py(v)):ctx.lineTo(px(i),py(v));});ctx.stroke();
+  data.forEach((v,i)=>{ctx.fillStyle=color;ctx.beginPath();ctx.arc(px(i),py(v),2.5,0,Math.PI*2);ctx.fill();});
+  const step=Math.max(1,Math.ceil(data.length/8));
+  labels.forEach((l,i)=>{if(i%step===0||i===data.length-1){ctx.fillStyle='#1f8a3d';ctx.font='8px Share Tech Mono';ctx.textAlign='center';ctx.fillText(l,px(i),H-4);}});
+}
+
+// ════════ INSIGHTS BATCH ════════
+async function batchInsights(ids,metrics,token){
+  if(!ids.length) return [];
+  try{
+    const batch=ids.map(id=>({method:'GET',relative_url:`${id}/insights?metric=${metrics.join(',')}`}));
+    const res=await fetch(`${API}/?batch=${encodeURIComponent(JSON.stringify(batch))}&include_headers=false&access_token=${encodeURIComponent(token)}`,{method:'POST'});
+    const data=await res.json();
+    if(!Array.isArray(data)) return ids.map(()=>({}));
+    return data.map(item=>{
+      if(!item||item.code!==200) return {};
+      try{ const body=JSON.parse(item.body); const r={}; (body.data||[]).forEach(m=>{r[m.name]=m.values?.[0]?.value||0;}); return r; }
+      catch{ return {}; }
+    });
+  }catch{ return ids.map(()=>({})); }
+}
+
+// ════════ REPORT ════════
+function genReport(pageId){
+  const data=cache[pageId]; if(!data?.posts?.length) return;
+  const {posts,fans}=data; const page=pages.find(p=>p.id===pageId);
+  const org=posts.filter(p=>!p._paid), paid=posts.filter(p=>p._paid);
+  const erOrg=avg(org.map(p=>{const b=p._reach>0?p._reach:fans;return b>0?p._eng/b*100:0;})).toFixed(2);
+  const top=[...org].sort((a,b)=>b._eng-a._eng).slice(0,3);
+  const fmts={}; posts.forEach(p=>{if(!fmts[p._fmt])fmts[p._fmt]={n:0,eng:0};fmts[p._fmt].n++;fmts[p._fmt].eng+=p._eng;});
+  const fmtLines=Object.entries(fmts).map(([k,v])=>`  ${k}: ${v.n} posts, ${Math.round(v.eng/v.n)} eng promedio`).join('\n');
+  const dayEng=[0,0,0,0,0,0,0],dayCnt=[0,0,0,0,0,0,0];
+  org.forEach(p=>{const d=p._dt.getDay();dayEng[d]+=p._eng;dayCnt[d]++;});
+  const dayAvg=dayEng.map((v,i)=>dayCnt[i]?Math.round(v/dayCnt[i]):0);
+  const report=`=== REPORTE SOCIAL MEDIA (v4) ===
+Página: ${page?.name||pageId}
+Fecha: ${new Date().toLocaleDateString('es-MX')}
+Seguidores: ${fmt(fans)}
+Posts totales: ${posts.length} (${org.length} orgánicos, ${paid.length} pagados marcados)
+Engagement Rate ORGÁNICO: ${erOrg}%
+
+--- TOP 3 ORGÁNICOS ---
+${top.map((p,i)=>`${i+1}. [${p._fmt}] "${(p.message||'Sin texto').slice(0,70)}..."
+   ${fmtDate(p.created_time)} | likes ${p._likes} coment ${p._comments} shares ${p._shares} | Alcance: ${p._reach>0?fmt(p._reach):'N/D'}`).join('\n\n')}
+
+--- RENDIMIENTO POR FORMATO ---
+${fmtLines}
+
+--- ENGAGEMENT POR DIA (organico) ---
+${DAYS.map((d,i)=>`  ${d}: ${dayCnt[i]} posts, ${dayAvg[i]} eng promedio`).join('\n')}
+
+--- POSTS MARCADOS COMO PAGADOS ---
+${paid.length?paid.map(p=>`  - "${(p.message||'').slice(0,50)}..." (${p._eng} eng)`).join('\n'):'  Ninguno marcado'}
+
+=== FIN ===
+Analiza con el modo ANALISIS de la skill de social media manager. Considera SOLO el rendimiento organico para el diagnostico (los pagados estan marcados aparte). Dame que funciona, que no, y 3 publicaciones concretas para esta semana.`;
+  document.getElementById('rptText').textContent=report;
+  document.getElementById('rptModal').style.display='flex';
+}
+function copyReport(){ navigator.clipboard.writeText(document.getElementById('rptText').textContent).then(()=>{const b=document.querySelector('#rptModal .btn-p');b.textContent='✅ Copiado';setTimeout(()=>b.textContent='📋 Copiar',2000);}); }
+
+// ════════ CSV ════════
+function exportCSV(pageId){
+  const data=cache[pageId]; if(!data?.posts?.length) return alert('Sin datos.');
+  let csv='\uFEFFFecha,Hora,Dia,Formato,Pagado,Texto,Likes,Comentarios,Compartidos,Engagement,Alcance,Impresiones,VideoViews\n';
+  sortPosts(getFiltered(data.posts)).forEach(p=>{
+    const txt=(p.message||'').replace(/"/g,'""').replace(/\n/g,' ');
+    csv+=`"${fmtDate(p.created_time)}",${p._dt.getHours()}:00,${DAYS[p._dt.getDay()]},${p._fmt},${p._paid?'SI':'NO'},"${txt}",${p._likes},${p._comments},${p._shares},${p._eng},${p._reach},${p._impr},${p._vviews}\n`;
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`${(pages.find(p=>p.id===pageId)?.name||'datos').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+}
+
+// ════════ HELPERS ════════
+async function api(path,token){const t=token||TOKEN,sep=path.includes('?')?'&':'?';const r=await fetch(`${API}${path}${sep}access_token=${encodeURIComponent(t)}`);const d=await r.json();if(d.error)throw new Error(d.error.message);return d;}
+function setStatus(s,m){const d=document.getElementById('sDot'),t=document.getElementById('sTxt');d.className='dot';t.textContent=m||'Cargando...';if(s==='ok')d.classList.add('ok');else if(s==='err')d.classList.add('err');}
+function welcomeErr(msg){const w=document.getElementById('welcome');w.style.display='flex';w.innerHTML=`<div class="ico">⚠️</div><h3>Error</h3><p>${esc(msg)}</p><button class="btn-p" onclick="openTM()">🔑 Actualizar Token</button>`;}
+function openTM(){document.getElementById('tkModal').style.display='flex';if(TOKEN)document.getElementById('tkInput').value=TOKEN;}
+function closeTM(){document.getElementById('tkModal').style.display='none';}
+function saveTK(){const t=document.getElementById('tkInput').value.trim();if(!t)return;TOKEN=t;localStorage.setItem('meta_token',t);closeTM();cache={};init();}
+function toggleSB(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sOv').classList.toggle('show');}
+function closeSB(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sOv').classList.remove('show');}
+function avg(a){return a.length?a.reduce((s,v)=>s+(v||0),0)/a.length:0;}
+function fmt(n){if(n===undefined||n===null)return'—';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toString();}
+function fmtDate(d){return new Date(d).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function sk(n,h){return[...Array(n)].map(()=>`<div class="skel" style="height:${h}px;border-radius:12px"></div>`).join('');}
+
+document.getElementById('tkModal').addEventListener('click',function(e){if(e.target===this)closeTM();});
+document.getElementById('tkInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveTK();});
+document.getElementById('rptModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+let _rt;window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(currentPage&&cache[currentPage.id])renderView();},250);});
+</script>
+</body>
+</html>
