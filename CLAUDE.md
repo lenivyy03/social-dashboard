@@ -1,9 +1,9 @@
 # Social Dashboard — Contexto del proyecto
 
 Dashboard de analítica para Meta (Facebook + Instagram) construido para Angel Ortega,
-social media manager en Hermosillo. Un solo archivo HTML (`index.html`), sin build step,
-vanilla JS + Canvas para gráficas + SheetJS (CDN) para exportar Excel. Se publica gratis
-vía GitHub Pages.
+social media manager en Hermosillo. Aplicación estática modular, sin build step:
+`index.html` como entrada, CSS y JavaScript separados bajo `assets/`, Canvas para gráficas
+y SheetJS (CDN) para exportar Excel. Se publica gratis vía GitHub Pages.
 
 ## Cómo correrlo
 Abrir `index.html` en el navegador. Pide un Access Token de Meta Graph API (se guarda en
@@ -15,8 +15,16 @@ Permisos de Meta necesarios (Graph API Explorer → developers.facebook.com/tool
 Instagram carga captions/likes pero el alcance/guardados quedan en 0 en silencio, sin error).
 
 ## Arquitectura
-- `loadPageData(pageId)` — trae posts de FB (hasta 100) + IG (hasta 100), corre insights,
-  hace merge, cachea en memoria (`cache[pageId]`), guarda snapshot para histórico.
+- `assets/js/state.js` — estado global, objetivos y preferencias locales.
+- `assets/js/meta-api.js` — carga de publicaciones, insights y diagnóstico de métricas.
+- `assets/js/storage.js` — snapshots agregados y snapshots por publicación en IndexedDB.
+- `assets/js/views.js` — vistas de analítica existentes.
+- `assets/js/laboratory.js` — buyer personas, objetivos, resultados de negocio y paquete para Codex.
+- `assets/js/reports.js` — reportes y exportación Excel.
+- `assets/js/app.js` — navegación e inicialización.
+- `loadPageData(pageId)` — trae los primeros 50 posts de FB + IG, corre insights,
+  hace merge, cachea en memoria (`cache[pageId]`) y guarda snapshots. Los lotes anteriores
+  se cargan bajo demanda mediante los cursores de paginación de Meta.
 - `probeMetrics(sampleIds, candidates, token)` — prueba qué métricas responde Meta ANTES
   de pedirlas en bulk. Prueba contra 2-3 posts de muestra (no solo 1) para no perder
   métricas válidas por mala suerte con el primer post. Es seguro agregar candidatas
@@ -75,7 +83,7 @@ completamente independientes, no hay forma de saber que son la misma pieza desde
 Botas San Felipe del Río, ALS (Ambientes Laborales Saludables), Dra. Laura Quintanar
 (radióloga), El Parián, Nissan Gran Auto, Mi Pensión Mi Retiro. Todos en Hermosillo,
 Sonora. El usuario usa este dashboard para armar reportes y recomendaciones de contenido
-para cada cliente — el botón "📋 Generar Reporte" produce texto para pegar en Claude.ai
+para cada cliente — el botón "📋 Generar Reporte" produce texto para pegar en Codex.ai
 y pedir análisis con la skill de social media manager.
 
 ## Deploy
