@@ -14,6 +14,26 @@ function shouldContinueRecentPaging(posts,now=new Date()){
   return posts.every(p=>new Date(p.created_time).getTime()>=cutoff);
 }
 
+function olderMonthRange(loadedMonths=4,now=new Date()){
+  const count=Math.max(4,Number(loadedMonths)||4);
+  const start=new Date(now.getFullYear(),now.getMonth()-count,1,0,0,0,0);
+  const end=new Date(start.getFullYear(),start.getMonth()+1,1,0,0,0,0);
+  return {start,end,key:`${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}`};
+}
+
+async function fetchPeriodPages(path,t){
+  const items=[];
+  let response=await api(path,t),pagesLoaded=0;
+  while(response&&pagesLoaded<20){
+    items.push(...(response.data||[]));
+    pagesLoaded++;
+    const next=response.paging?.next;
+    if(!next) break;
+    response=await apiUrl(next);
+  }
+  return items;
+}
+
 function prepareLoadedPosts(posts){
   posts.forEach(p=>{
     if(p._plat==='FB'){
@@ -63,7 +83,7 @@ async function loadPageData(pageId,onProgress){
   const igPosts=filterRecentPosts(igRaw);
   const posts=prepareLoadedPosts(filterRecentPosts([...fbPosts,...igPosts]));
   const fans=pi.fan_count||pi.followers_count||0,igFans=ii.followers_count||0;
-  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,paging:{fb:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null,ig:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null},loadingMore:false,metricsLoading:true,fromCache:false};
+  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,paging:{fb:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null,ig:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null},loadedMonths:4,loadingMore:false,metricsLoading:true,fromCache:false};
   onProgress?.('base');
 
   // Las métricas de ambas redes se completan en paralelo mientras la interfaz ya es visible.
@@ -177,47 +197,45 @@ async function enrichIGPosts(igPosts,t,pageId='global'){
   return {igPhoto:igMetricsPhoto,igVideo:igMetricsVideo};
 }
 
-// Trae el siguiente lote de FB y/o IG usando el cursor "paging.next" que ya trae Meta.
-// Descarta lo anterior a la ventana de cuatro meses y deja de paginar al cruzarla.
+// Agrega un mes calendario anterior completo. La carga inicial sigue siendo de cuatro
+// meses; cada clic amplía la ventana exactamente un mes, sin depender del cursor inicial.
 async function loadMorePosts(pageId){
   const data=cache[pageId];
   if(!data||data.loadingMore) return;
-  if(!data.paging||(!data.paging.fb&&!data.paging.ig)) return;
   const t=window._pt[pageId]||TOKEN;
+  const page=pages.find(p=>p.id===pageId);
+  const igId=page?.instagram_business_account?.id||null;
+  const range=olderMonthRange(loadedMonthCount(data));
+  const since=Math.floor(range.start.getTime()/1000),until=Math.floor(range.end.getTime()/1000);
   data.loadingMore=true; renderView();
   try{
-    const fbTask=data.paging.fb?(async()=>{
-      const pr=await apiUrl(data.paging.fb);
-      const fbRaw=pr.data||[];
-      const newFb=filterRecentPosts(fbRaw);
+    const fbTask=(async()=>{
+      const fbRaw=await fetchPeriodPages(`/${pageId}/posts?fields=id,message,created_time,full_picture,status_type,attachments{media_type,type},likes.summary(true),comments.summary(true),shares&since=${since}&until=${until}&limit=50`,t);
+      const newFb=fbRaw;
       newFb.forEach(p=>{ p._plat='FB'; p._fmt=getFormat(p); });
       const fbDebug=await enrichFBPosts(newFb,t,pageId);
-      return {posts:newFb,debug:fbDebug,next:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null};
-    })():Promise.resolve({posts:[],debug:{fb:[],fbVideo:[]},next:null});
-    const igTask=data.paging.ig?(async()=>{
-      const mr=await apiUrl(data.paging.ig);
-      const igRaw=(mr.data||[]).map(igMediaToPost);
-      const newIg=filterRecentPosts(igRaw);
+      return {posts:newFb,debug:fbDebug};
+    })();
+    const igTask=igId?(async()=>{
+      const igRaw=(await fetchPeriodPages(`/${igId}/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,like_count,comments_count&since=${since}&until=${until}&limit=50`,t)).map(igMediaToPost);
+      const newIg=igRaw;
       const igDebug=await enrichIGPosts(newIg,t,pageId);
-      return {posts:newIg,debug:igDebug,next:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null};
-    })():Promise.resolve({posts:[],debug:{igPhoto:[],igVideo:[]},next:null});
+      return {posts:newIg,debug:igDebug};
+    })().catch(e=>{console.warn('No se cargó el mes anterior de Instagram:',e.message);return {posts:[],debug:{igPhoto:[],igVideo:[]}};}):Promise.resolve({posts:[],debug:{igPhoto:[],igVideo:[]}});
     const [fbResult,igResult]=await Promise.all([fbTask,igTask]);
     const newFb=fbResult.posts,newIg=igResult.posts;
     data.debug.fb=[...new Set([...data.debug.fb,...fbResult.debug.fb])];
     data.debug.fbVideo=[...new Set([...data.debug.fbVideo,...fbResult.debug.fbVideo])];
     data.debug.igPhoto=[...new Set([...data.debug.igPhoto,...igResult.debug.igPhoto])];
     data.debug.igVideo=[...new Set([...data.debug.igVideo,...igResult.debug.igVideo])];
-    data.paging.fb=fbResult.next; data.paging.ig=igResult.next;
-    [...newFb,...newIg].forEach(p=>{
-      p._eng=(p._likes||0)+(p._comments||0)+(p._shares||0);
-      p._dt=new Date(p.created_time);
-      p._paid=!!LS.paid[p.id];
-    });
-    data.posts=filterRecentPosts([...data.posts,...newFb,...newIg]).sort((a,b)=>b._dt-a._dt);
+    const byId=new Map(data.posts.map(p=>[p.id,p]));
+    prepareLoadedPosts([...newFb,...newIg]).forEach(p=>byId.set(p.id,p));
+    data.posts=prepareLoadedPosts([...byId.values()]);
+    data.loadedMonths=loadedMonthCount(data)+1;
     autoLinkSameDay(data.posts.filter(p=>p._plat==='FB'),data.posts.filter(p=>p._plat==='IG'));
     recordSnapshot(pageId,data.fans,data.posts);
     savePageDataCache(pageId,data).catch(e=>console.warn('No se guardó la caché:',e.message));
-  }catch(e){ alert('No se pudieron cargar más publicaciones: '+e.message); }
+  }catch(e){ alert('No se pudo cargar el mes anterior: '+e.message); }
   data.loadingMore=false;
   renderView();
 }

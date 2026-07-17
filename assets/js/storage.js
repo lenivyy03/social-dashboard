@@ -61,7 +61,7 @@ async function getPageDataCache(pageId){
   if(!record||Date.now()-record.savedAt>PAGE_CACHE_TTL_MS) return null;
   const data=record.data;
   data.posts=filterRecentPosts(data.posts||[]).map(p=>({...p,_dt:new Date(p.created_time),_paid:!!LS.paid[p.id]}));
-  return {...data,paging:{fb:null,ig:null},loadingMore:false,fromCache:true,cachedAt:record.savedAt};
+  return {...data,paging:{fb:null,ig:null},loadedMonths:4,loadingMore:false,fromCache:true,cachedAt:record.savedAt};
 }
 
 async function clearPageDataCache(){

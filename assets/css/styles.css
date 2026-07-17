@@ -209,6 +209,8 @@ details.card-box[open] summary::before{content:'▾ '}
 .chart-axis-guide strong{color:var(--text)}
 .metric-control .period-select{min-width:190px}
 .order-control .period-select{min-width:160px}
+.load-older-btn{border-color:var(--accent);color:var(--text);background:#fff}
+.load-older-btn:hover{background:var(--accent);color:#fff}
 
 /* MODALS */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}

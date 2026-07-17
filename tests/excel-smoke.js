@@ -36,7 +36,7 @@ vm.runInContext(`
     message:'Publicación de ejemplo',_likes:12,_comments:3,_shares:2,_saved:1,
     _eng:17,_reach:450,_impr:600,_vviews:300
   });
-  cache={'page-1':{posts:[makePost('fb-1','FB',fbDate),makePost('ig-1','IG',igDate)]}};
+  cache={'page-1':{posts:[makePost('fb-1','FB',fbDate),makePost('ig-1','IG',igDate)],loadedMonths:6}};
   LS.pairs=[{fb:'fb-1',ig:'ig-1',auto:false}];
   exportXLSX('page-1');
 `,context);
@@ -51,8 +51,8 @@ for(const name of captured.SheetNames){
 }
 assert.equal(captured.Sheets.Facebook.A5.t,'d','Las fechas deben conservarse como fechas de Excel');
 assert.equal(captured.Sheets.General.A1.v,'Cliente de Prueba · REPORTE GENERAL');
-assert.match(captured.Sheets.General.A2.v,/Ventana: últimos 4 meses/);
-assert.match(capturedFileName,/ultimos_4_meses/);
+assert.match(captured.Sheets.General.A2.v,/Ventana: últimos 6 meses/);
+assert.match(capturedFileName,/ultimos_6_meses/);
 
 if(process.argv[3]){
   const bytes=XLSX.write(captured,{bookType:'xlsx',type:'array',cellStyles:true});

@@ -72,9 +72,9 @@ function renderMonthDropdown(data){
 function setMonthFilter(v){ monthFilter=v||null; renderView(); }
 
 function renderLoadMoreBtn(data){
-  if(!data.paging||(!data.paging.fb&&!data.paging.ig)) return '';
-  if(data.loadingMore) return `<button class="ctrl-btn" disabled style="opacity:.5;cursor:default">⏳ Cargando publicaciones más viejas...</button>`;
-  return `<button class="ctrl-btn" onclick="loadMorePosts('${currentPage.id}')">⏬ Cargar más publicaciones de estos 4 meses</button>`;
+  const nextMonth=olderMonthRange(loadedMonthCount(data)).key;
+  if(data.loadingMore) return `<button class="ctrl-btn" disabled style="opacity:.5;cursor:default">⏳ Cargando ${monthLabel(nextMonth)}...</button>`;
+  return `<button class="ctrl-btn load-older-btn" onclick="loadMorePosts('${currentPage.id}')">⏬ Cargar mes anterior · ${monthLabel(nextMonth)}</button>`;
 }
 
 // ── Shell with view tabs ──
@@ -132,7 +132,7 @@ function renderView(){
   if(!data){ document.getElementById('viewBody').innerHTML=`<div class="state-box"><div class="ico">⚠️</div><h3>Sin datos</h3></div>`; return; }
   const nFb=data.posts.filter(p=>p._plat==='FB').length, nIg=data.posts.filter(p=>p._plat==='IG').length;
   const loadNote=data.metricsLoading?' · ⏳ completando alcance y views':data.fromCache?' · ⚡ datos guardados':'';
-  document.getElementById('subLine').textContent=`Últimos 4 meses · 📘 ${nFb} posts · ${fmt(data.fans)} seg.${data.hasIG?` | 📸 ${nIg} posts · ${fmt(data.igFans)} seg.`:''}${loadNote}`;
+  document.getElementById('subLine').textContent=`${loadedPeriodLabel(data)} · 📘 ${nFb} posts · ${fmt(data.fans)} seg.${data.hasIG?` | 📸 ${nIg} posts · ${fmt(data.igFans)} seg.`:''}${loadNote}`;
   const labMode=currentView==='laboratorio';
   const compareMode=currentView==='comparar';
   document.getElementById('platTabs').style.display=labMode?'none':'flex';

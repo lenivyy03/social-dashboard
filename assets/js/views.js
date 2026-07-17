@@ -124,7 +124,8 @@ function viewComparar(data){
   const selected=new Set([compareMonthA,compareMonthB].filter(Boolean));
   const chartPosts=compareMonthB?allFiltered.filter(p=>selected.has(monthKey(p._dt))):allFiltered;
   let posts=chartPosts;
-  const periodPanel=compareMonthB?monthComparisonPanel(chartPosts,compareMonthA,compareMonthB):`<div class="insight compare-all-note"><span class="ico">📚</span>Mostrando juntas <strong>todas las publicaciones de los últimos 4 meses</strong>. Elige un segundo mes para activar la comparación VS.</div>`;
+  const periodLabel=loadedPeriodLabel(data).toLowerCase();
+  const periodPanel=compareMonthB?monthComparisonPanel(chartPosts,compareMonthA,compareMonthB):`<div class="insight compare-all-note"><span class="ico">📚</span>Mostrando juntas <strong>todas las publicaciones de los ${periodLabel}</strong>. Elige un segundo mes para activar la comparación VS.</div>`;
   const nSugg=suggestPairs(data).length;
   if(combineMode) posts=combinePairs(posts);
   const monthATablePosts=compareMonthB?posts.filter(p=>monthKey(p._dt)===compareMonthA):[];
@@ -161,14 +162,14 @@ function viewComparar(data){
     ${combineInsight}
     <div class="card-box">
       <div class="card-hdr">
-        <div class="card-title">${compareMonthB?`${monthLabel(compareMonthA)} VS ${monthLabel(compareMonthB)}`:'Todas las publicaciones · últimos 4 meses'}</div>
+        <div class="card-title">${compareMonthB?`${monthLabel(compareMonthA)} VS ${monthLabel(compareMonthB)}`:`Todas las publicaciones · ${periodLabel}`}</div>
         <div class="controls">
           <button class="ctrl-btn ${compareFilter==='todos'?'active':''}" onclick="setFilter('todos')">Todos</button>
           <button class="ctrl-btn ${compareFilter==='organico'?'active':''}" onclick="setFilter('organico')">🟢 Orgánico</button>
           <button class="ctrl-btn ${compareFilter==='pagado'?'active':''}" onclick="setFilter('pagado')">💰 Pagado</button>
           <button class="ctrl-btn ${combineMode?'active':''}" onclick="toggleCombine()">🔗 Ver piezas vinculadas</button>
           <button class="btn-report" onclick="openLinkModal()">🔗 Vincular piezas${nSugg?` (${nSugg})`:''}</button>
-          <button class="btn-export" onclick="exportXLSX('${currentPage.id}')" title="Incluye únicamente las publicaciones cargadas de los últimos 4 meses">📥 Excel · 4 meses</button>
+          <button class="btn-export" onclick="exportXLSX('${currentPage.id}')" title="Incluye las publicaciones de todos los meses cargados">📥 Excel · ${loadedMonthCount(data)} meses</button>
         </div>
       </div>
       <div class="chart-axis-guide"><span><strong>Eje X:</strong> ${chartOrderHelp}</span><span><strong>Eje Y:</strong> ${metric.label} · ${metric.help}</span></div>

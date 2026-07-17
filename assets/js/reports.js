@@ -134,7 +134,8 @@ function exportXLSX(pageId){
 
   const wb=XLSX.utils.book_new();
   const pageName=pages.find(p=>p.id===pageId)?.name||'Social Dashboard';
-  const generated=`Ventana: últimos 4 meses (mes actual + 3 anteriores) · ${all.length} publicaciones · Generado el ${fmtDate(new Date())}`;
+  const months=loadedMonthCount(data);
+  const generated=`Ventana: últimos ${months} meses · ${all.length} publicaciones · Generado el ${fmtDate(new Date())}`;
   const baseHeaders=Object.keys(rowOf(all[0],false));
   const generalHeaders=Object.keys(rowOf(all[0],true));
 
@@ -166,7 +167,7 @@ function exportXLSX(pageId){
   const linkHeaders=['FechaFB','FechaIG','Formato','TextoFB','TextoIG','LikesFB','LikesIG','LikesTotal','ComentariosTotal','CompartidosTotal','GuardadosTotal','EngagementTotal','AlcanceTotal','VideoViewsTotal'];
   XLSX.utils.book_append_sheet(wb,styledExcelSheet(`${pageName} · PIEZAS VINCULADAS`,generated,linkHeaders,linkRows),'Vinculadas');
 
-  wb.Props={Title:`Reporte social de ${pageName} · últimos 4 meses`,Subject:'Analítica de Facebook e Instagram · ventana móvil de 4 meses',Author:'social.dashboard',CreatedDate:new Date()};
-  const fname=`${pageName.replace(/[^a-z0-9áéíóúñ]+/gi,'_')}_ultimos_4_meses_${new Date().toISOString().slice(0,10)}.xlsx`;
+  wb.Props={Title:`Reporte social de ${pageName} · últimos ${months} meses`,Subject:`Analítica de Facebook e Instagram · ventana móvil de ${months} meses`,Author:'social.dashboard',CreatedDate:new Date()};
+  const fname=`${pageName.replace(/[^a-z0-9áéíóúñ]+/gi,'_')}_ultimos_${months}_meses_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(wb,fname,{bookType:'xlsx',cellStyles:true,compression:true});
 }
