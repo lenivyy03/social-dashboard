@@ -16,11 +16,14 @@ let monthFilter=null;            // null=todos los posts cacheados; 'YYYY-MM' pa
 let compareMonthA=null;           // mes principal de Comparar Posts
 let compareMonthB=null;           // segundo mes opcional de Comparar Posts
 let compareMetric='eng';           // métrica visible en las barras de Comparar Posts
+let compareChartOrder='chronological'; // chronological | table
 let growthYear=null;              // año visible en Crecimiento de Seguidores
 
 const COMPARE_CHART_METRICS={
   eng:{key:'_eng',label:'Engagement total',help:'Likes + comentarios + compartidos'},
   likes:{key:'_likes',label:'Likes',help:'Cantidad de Me gusta por publicación'},
+  comments:{key:'_comments',label:'Comentarios',help:'Cantidad de comentarios por publicación'},
+  shares:{key:'_shares',label:'Compartidos',help:'Veces que se compartió cada publicación'},
   reach:{key:'_reach',label:'Alcance',help:'Personas o cuentas alcanzadas'},
   views:{key:'_vviews',label:'Reproducciones',help:'Views o plays registrados por Meta'}
 };

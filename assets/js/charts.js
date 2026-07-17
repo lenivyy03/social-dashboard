@@ -8,10 +8,11 @@ function drawTimeline(posts,id){
   barChartLabeled(c.getContext('2d'),W,H,sorted.map(p=>p._eng),sorted.map(p=>`${String(p._dt.getDate()).padStart(2,'0')}/${String(p._dt.getMonth()+1).padStart(2,'0')}`),'#111111',sorted.map(p=>p._paid));
 }
 
-function drawBars(posts,id,metricKey='_eng',maxOverride=null){
+function drawBars(posts,id,metricKey='_eng',maxOverride=null,orderMode='chronological'){
   const c=document.getElementById(id); if(!c)return;
-  // La tabla puede ordenarse por rendimiento; la gráfica siempre conserva el tiempo.
-  const sorted=[...posts].sort((a,b)=>a._dt-b._dt||String(a._plat).localeCompare(String(b._plat)));
+  const sorted=orderMode==='table'
+    ? sortPosts(posts)
+    : [...posts].sort((a,b)=>a._dt-b._dt||String(a._plat).localeCompare(String(b._plat)));
   const W=c.parentElement.clientWidth-36,H=220; setupCanvas(c,W,H);
   barChartLabeled(c.getContext('2d'),W,H,sorted.map(p=>p[metricKey]||0),sorted.map(p=>`${String(p._dt.getDate()).padStart(2,'0')}/${String(p._dt.getMonth()+1).padStart(2,'0')}·${p._plat==='IG'?'I':'F'}`),'#111111',sorted.map(p=>p._paid),maxOverride);
 }

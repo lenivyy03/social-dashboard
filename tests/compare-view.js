@@ -19,7 +19,7 @@ vm.runInContext(`
   monthKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
   monthLabel=k=>{const [y,m]=k.split('-');return MONTHS_ES[Number(m)-1]+' '+y;};
   currentPage={id:'page-1'};platFilter='todos';compareFilter='todos';combineMode=false;
-  drawBars=(posts,id,metric,max)=>{if(!globalThis.__charts)globalThis.__charts=[];__charts.push({id,count:posts.length,metric,max});};
+  drawBars=(posts,id,metric,max,order)=>{if(!globalThis.__charts)globalThis.__charts=[];__charts.push({id,count:posts.length,metric,max,order});};
   renderTable=posts=>{globalThis.__tableCount=posts.length;};
   const makePost=(id,date)=>({id,_dt:new Date(date),created_time:date,_plat:'FB',_fmt:'Foto',_paid:false,_eng:10,_likes:5,_comments:3,_shares:2,_reach:100,_vviews:0,message:id});
   globalThis.__data={posts:[makePost('jul','2026-07-05T12:00:00'),makePost('jun','2026-06-05T12:00:00'),makePost('may','2026-05-05T12:00:00')]};
@@ -42,4 +42,14 @@ vm.runInContext(`compareMetric='reach';globalThis.__charts=[];viewComparar(__dat
 assert(context.__charts.every(entry=>entry.metric==='_reach'));
 assert.match(viewBody.innerHTML,/Eje Y:<\/strong> Alcance/);
 
-console.log('Compare view test OK: vista completa sin VS y dos gráficas con VS.');
+vm.runInContext(`
+  renderView=()=>viewComparar(__data);
+  globalThis.__charts=[];
+  sortBy('likes');
+`,context);
+assert(context.__charts.every(entry=>entry.metric==='_likes'));
+assert(context.__charts.every(entry=>entry.order==='table'));
+assert.match(viewBody.innerHTML,/Igual que la tabla/);
+assert.match(viewBody.innerHTML,/Likes · mayor a menor/);
+
+console.log('Compare view test OK: VS, métricas y orden sincronizado con la tabla.');

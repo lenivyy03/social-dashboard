@@ -35,6 +35,8 @@ assert.equal(vm.runInContext("surfaceFormat('carousel')",context),'Álbum');
 assert.equal(vm.runInContext("GOALS.sales.outcome",context),'sales');
 assert.equal(vm.runInContext("COMPARE_CHART_METRICS.eng.key",context),'_eng');
 assert.equal(vm.runInContext("COMPARE_CHART_METRICS.reach.label",context),'Alcance');
+assert.equal(vm.runInContext("COMPARE_CHART_METRICS.comments.key",context),'_comments');
+assert.equal(vm.runInContext("compareChartOrder",context),'chronological');
 assert.equal(vm.runInContext("blankPersona().name",context),'Nuevo buyer persona');
 assert.match(html,/xlsx-js-style@1\.2\.0/,'La exportación debe cargar la versión de Excel con estilos');
 

@@ -195,6 +195,7 @@ details.card-box[open] summary::before{content:'▾ '}
 .chart-axis-guide{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border:1px solid #d8d4c8;border-left:4px solid var(--accent);background:#faf9f5;padding:8px 10px;margin-bottom:12px;font-size:9px;color:var(--muted)}
 .chart-axis-guide strong{color:var(--text)}
 .metric-control .period-select{min-width:190px}
+.order-control .period-select{min-width:160px}
 
 /* MODALS */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}
