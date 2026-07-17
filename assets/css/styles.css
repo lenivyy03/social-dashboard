@@ -77,6 +77,11 @@ canvas{display:block;max-width:100%}
 .ctrl-btn{padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono';font-size:11px;cursor:pointer;font-weight:500}
 .ctrl-btn:hover{background:rgba(0,0,0,.06)}
 .ctrl-btn.active{background:var(--text);color:#fff;border-color:var(--text)}
+.period-control{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+.period-control.compact{gap:6px}
+.period-select{min-width:155px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:0;padding:7px 34px 7px 10px;font-family:'JetBrains Mono';font-size:11px;font-weight:600;text-transform:uppercase;outline:none;cursor:pointer}
+.period-control.compact .period-select{min-width:84px;padding-block:5px}
+.period-select:focus{box-shadow:3px 3px 0 var(--accent)}
 .btn-export{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--green);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'JetBrains Mono';font-weight:500}
 .btn-export:hover{background:rgba(34,197,94,.2)}
 .btn-report{background:rgba(247,201,72,.1);border:1px solid rgba(247,201,72,.25);color:var(--yellow);padding:5px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'JetBrains Mono';font-weight:500}
@@ -163,6 +168,50 @@ details.card-box[open] summary::before{content:'▾ '}
 .csv2{font-family:'Space Grotesk';font-size:18px;font-weight:700}
 .csl2{font-size:9px;color:var(--muted);text-transform:uppercase}
 
+/* MONTH / YEAR COMPARISON */
+.compare-periods{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--border);padding:14px 16px;margin-bottom:18px}
+.compare-periods .period-control{align-items:flex-start;flex-direction:column;gap:5px}
+.compare-vs{align-self:flex-end;background:var(--text);color:#fff;border:1px solid var(--text);padding:7px 10px;font-family:'Space Grotesk';font-size:11px;font-weight:700}
+.month-compare-summary{background:#fff;border:1px solid var(--border);border-left:5px solid var(--accent);padding:16px;margin-bottom:18px}
+.month-compare-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:13px;font-size:12px;text-transform:uppercase}
+.month-compare-head span{color:var(--muted);font-size:10px}
+.month-compare-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.month-compare-card{border:1px solid #d8d4c8;padding:11px;min-width:0}
+.month-compare-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}
+.month-compare-values{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-family:'Space Grotesk'}
+.month-compare-values strong{font-size:19px}.month-compare-values span{font-size:13px;color:var(--muted)}
+.month-delta{margin-top:7px;font-size:11px;font-weight:700}.month-delta small{display:block;margin-top:2px;font-size:8px;color:var(--muted);font-weight:400}
+.month-delta.positive,.growth-summary .positive{color:var(--green)}
+.month-delta.negative,.growth-summary .negative{color:var(--red)}
+.month-delta.neutral{color:var(--muted)}
+.growth-summary{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #ddd8c9;padding:0 2px 10px;margin-bottom:6px;font-size:9px;color:var(--muted);text-transform:uppercase}
+.growth-summary strong{font-size:11px}
+.compare-all-note{margin-bottom:18px}
+.compare-chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.compare-chart-panel{border:1px solid #d8d4c8;padding:13px;min-width:0;background:#faf9f5}
+.compare-chart-title{font-family:'Space Grotesk';font-size:12px;font-weight:700;text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px}
+.compare-chart-title span{font-family:'JetBrains Mono';font-size:9px;color:var(--muted);font-weight:500}
+.compare-chart-metric{font-size:9px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.7px;margin:-3px 0 8px}
+.compare-table-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.compare-table-card{min-width:0}
+.mini-table-count{font-size:9px;color:var(--muted);text-transform:uppercase}
+.mini-compare-table table{min-width:430px;font-size:10px}
+.mini-compare-table th{padding:8px;cursor:default;font-size:9px}
+.mini-compare-table td{padding:8px}
+.mini-date{white-space:nowrap;color:var(--muted);width:82px}
+.mini-platform{text-align:center;white-space:nowrap;width:48px}
+.mini-content{max-width:230px}
+.mini-content .tag{margin-right:7px;vertical-align:middle}
+.mini-content>span:last-child{display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.mini-metric{color:var(--accent);white-space:nowrap;width:82px}
+.mini-empty{text-align:center;color:var(--muted);padding:18px!important}
+.chart-axis-guide{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border:1px solid #d8d4c8;border-left:4px solid var(--accent);background:#faf9f5;padding:8px 10px;margin-bottom:12px;font-size:9px;color:var(--muted)}
+.chart-axis-guide strong{color:var(--text)}
+.metric-control .period-select{min-width:190px}
+.order-control .period-select{min-width:160px}
+.load-older-btn{border-color:var(--accent);color:var(--text);background:#fff}
+.load-older-btn:hover{background:var(--accent);color:#fff}
+
 /* MODALS */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}
 .modal{background:var(--surface);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:26px;width:460px;max-width:calc(100vw - 32px)}
@@ -213,6 +262,9 @@ details.card-box[open] summary::before{content:'▾ '}
   .s-overlay.show{display:block}
   .main{padding:14px}.stats-grid{grid-template-columns:repeat(2,1fr)}
   .posts-grid{grid-template-columns:1fr}.topbar .t-status span{display:none}
+  .month-compare-grid{grid-template-columns:repeat(2,1fr)}
+  .compare-periods{align-items:stretch}.compare-periods .period-control{flex:1;min-width:140px}.compare-periods .period-select{width:100%}
+  .compare-chart-grid,.compare-table-grid{grid-template-columns:1fr}
 }
 
 /* ═══════ BRUTALIST SPEC-SHEET THEME ═══════ */

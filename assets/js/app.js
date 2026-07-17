@@ -31,42 +31,50 @@ function selectPage(id, btn){
   document.getElementById('cmpBtn').classList.remove('active');
   currentPage=page; currentView='resumen'; closeSB();
   renderShell(page);
-  loadPageData(page.id).then(()=>{ initMonthFilter(); renderView(); }).catch(e=>{ document.getElementById('viewBody').innerHTML=`<div class="state-box"><div class="ico">⚠️</div><h3>Error</h3><p>${esc(e.message)}</p></div>`; });
+  let initialized=false;
+  const showProgress=()=>{
+    if(currentPage?.id!==page.id) return;
+    if(!initialized){ initMonthFilter(); initialized=true; }
+    renderView();
+  };
+  loadPageData(page.id,showProgress).then(showProgress).catch(e=>{ document.getElementById('viewBody').innerHTML=`<div class="state-box"><div class="ico">⚠️</div><h3>Error</h3><p>${esc(e.message)}</p></div>`; });
 }
 
 // Mes por default: el mes calendario actual si hay posts ahí; si no, el mes más
-// reciente que sí tenga posts. El usuario puede luego elegir "Todos" o varios meses.
+// reciente que sí tenga posts. El usuario puede luego elegir otro mes o "Todos".
 function initMonthFilter(){
   const data=cache[currentPage.id]; if(!data){ monthFilter=null; return; }
   const months=[...new Set(data.posts.map(p=>monthKey(p._dt)))].sort().reverse();
   const nowKey=monthKey(new Date());
-  if(months.includes(nowKey)) monthFilter=new Set([nowKey]);
-  else if(months.length) monthFilter=new Set([months[0]]);
+  if(months.includes(nowKey)) monthFilter=nowKey;
+  else if(months.length) monthFilter=months[0];
   else monthFilter=null;
+  if(!compareMonthA||!months.includes(compareMonthA)) compareMonthA=monthFilter||months[0]||null;
+  if(compareMonthB&&!months.includes(compareMonthB)) compareMonthB=null;
 }
 function monthKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function monthLabel(k){
+  if(!k) return 'Todos';
+  const [y,m]=k.split('-');
+  return `${MONTHS_ES[parseInt(m,10)-1]} ${y}`;
+}
 
-function renderMonthChips(data){
+function renderMonthDropdown(data){
   const months=[...new Set(data.posts.map(p=>monthKey(p._dt)))].sort().reverse();
   if(!months.length) return '';
-  const label=k=>{ const [y,m]=k.split('-'); return `${MONTHS_ES[parseInt(m,10)-1]} ${y}`; };
-  const chips=months.map(k=>`<button class="ctrl-btn ${monthFilter&&monthFilter.has(k)?'active':''}" onclick="toggleMonth('${k}')">${label(k)}</button>`).join('');
-  return `<span style="font-size:11px;color:var(--muted);margin-right:2px">📅 Periodo:</span>
-    <button class="ctrl-btn ${!monthFilter?'active':''}" onclick="setMonthFilter(null)">Todos</button>
-    ${chips}`;
+  return `<label class="period-control"><span>📅 Periodo</span>
+    <select class="period-select" onchange="setMonthFilter(this.value)">
+      <option value="" ${!monthFilter?'selected':''}>Todos los meses</option>
+      ${months.map(k=>`<option value="${k}" ${monthFilter===k?'selected':''}>${monthLabel(k)}</option>`).join('')}
+    </select>
+  </label>`;
 }
-function toggleMonth(k){
-  if(!monthFilter){ monthFilter=new Set([k]); }
-  else if(monthFilter.has(k)){ monthFilter.delete(k); if(monthFilter.size===0) monthFilter=null; }
-  else { monthFilter.add(k); }
-  renderView();
-}
-function setMonthFilter(v){ monthFilter=v; renderView(); }
+function setMonthFilter(v){ monthFilter=v||null; renderView(); }
 
 function renderLoadMoreBtn(data){
-  if(!data.paging||(!data.paging.fb&&!data.paging.ig)) return '';
-  if(data.loadingMore) return `<button class="ctrl-btn" disabled style="opacity:.5;cursor:default">⏳ Cargando publicaciones más viejas...</button>`;
-  return `<button class="ctrl-btn" onclick="loadMorePosts('${currentPage.id}')">⏬ Cargar publicaciones más viejas</button>`;
+  const nextMonth=olderMonthRange(loadedMonthCount(data)).key;
+  if(data.loadingMore) return `<button class="ctrl-btn" disabled style="opacity:.5;cursor:default">⏳ Cargando ${monthLabel(nextMonth)}...</button>`;
+  return `<button class="ctrl-btn load-older-btn" onclick="loadMorePosts('${currentPage.id}')">⏬ Cargar mes anterior · ${monthLabel(nextMonth)}</button>`;
 }
 
 // ── Shell with view tabs ──
@@ -107,7 +115,7 @@ function P(data){
   let arr=data.posts;
   if(platFilter==='fb') arr=arr.filter(p=>p._plat==='FB');
   else if(platFilter==='ig') arr=arr.filter(p=>p._plat==='IG');
-  if(monthFilter) arr=arr.filter(p=>monthFilter.has(monthKey(p._dt)));
+  if(monthFilter) arr=arr.filter(p=>monthKey(p._dt)===monthFilter);
   return arr;
 }
 
@@ -123,12 +131,14 @@ function renderView(){
   const data=cache[currentPage.id];
   if(!data){ document.getElementById('viewBody').innerHTML=`<div class="state-box"><div class="ico">⚠️</div><h3>Sin datos</h3></div>`; return; }
   const nFb=data.posts.filter(p=>p._plat==='FB').length, nIg=data.posts.filter(p=>p._plat==='IG').length;
-  document.getElementById('subLine').textContent=`📘 ${nFb} posts · ${fmt(data.fans)} seg.${data.hasIG?` | 📸 ${nIg} posts · ${fmt(data.igFans)} seg.`:''}`;
+  const loadNote=data.metricsLoading?' · ⏳ completando alcance y views':data.fromCache?' · ⚡ datos guardados':'';
+  document.getElementById('subLine').textContent=`${loadedPeriodLabel(data)} · 📘 ${nFb} posts · ${fmt(data.fans)} seg.${data.hasIG?` | 📸 ${nIg} posts · ${fmt(data.igFans)} seg.`:''}${loadNote}`;
   const labMode=currentView==='laboratorio';
+  const compareMode=currentView==='comparar';
   document.getElementById('platTabs').style.display=labMode?'none':'flex';
-  document.getElementById('monthTabsWrap').style.display=labMode?'none':'flex';
+  document.getElementById('monthTabsWrap').style.display=(labMode||compareMode)?'none':'flex';
   document.getElementById('loadMoreWrap').style.display=labMode?'none':'block';
-  document.getElementById('monthTabsWrap').innerHTML=labMode?'':renderMonthChips(data);
+  document.getElementById('monthTabsWrap').innerHTML=(labMode||compareMode)?'':renderMonthDropdown(data);
   document.getElementById('loadMoreWrap').innerHTML=labMode?'':renderLoadMoreBtn(data);
   if(currentView==='resumen') viewResumen(data);
   else if(currentView==='comparar') viewComparar(data);
@@ -142,7 +152,7 @@ function setStatus(s,m){const d=document.getElementById('sDot'),t=document.getEl
 function welcomeErr(msg){const w=document.getElementById('welcome');w.style.display='flex';w.innerHTML=`<div class="ico">⚠️</div><h3>Error</h3><p>${esc(msg)}</p><button class="btn-p" onclick="openTM()">🔑 Actualizar Token</button>`;}
 function openTM(){document.getElementById('tkModal').style.display='flex';if(TOKEN)document.getElementById('tkInput').value=TOKEN;}
 function closeTM(){document.getElementById('tkModal').style.display='none';}
-function saveTK(){const t=document.getElementById('tkInput').value.trim();if(!t)return;TOKEN=t;localStorage.setItem('meta_token',t);closeTM();cache={};init();}
+function saveTK(){const t=document.getElementById('tkInput').value.trim();if(!t)return;TOKEN=t;localStorage.setItem('meta_token',t);closeTM();cache={};clearPageDataCache().catch(()=>{});init();}
 function toggleSB(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sOv').classList.toggle('show');}
 function closeSB(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sOv').classList.remove('show');}
 

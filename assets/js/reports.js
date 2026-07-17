@@ -36,7 +36,61 @@ Analiza con el modo ANALISIS de la skill de social media manager. Considera SOLO
 }
 function copyReport(){ navigator.clipboard.writeText(document.getElementById('rptText').textContent).then(()=>{const b=document.querySelector('#rptModal .btn-p');b.textContent='✅ Copiado';setTimeout(()=>b.textContent='📋 Copiar',2000);}); }
 
-// ════════ CSV ════════
+// ════════ EXCEL ════════
+function styledExcelSheet(title,subtitle,headers,rows){
+  const matrix=[
+    [title],
+    [subtitle],
+    [],
+    headers,
+    ...rows.map(row=>headers.map(header=>row[header]??''))
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(matrix,{cellDates:true});
+  const lastCol=headers.length-1,lastRow=matrix.length-1;
+  const border={top:{style:'thin',color:{rgb:'D8D4C8'}},bottom:{style:'thin',color:{rgb:'D8D4C8'}},left:{style:'thin',color:{rgb:'D8D4C8'}},right:{style:'thin',color:{rgb:'D8D4C8'}}};
+  const titleStyle={font:{name:'Aptos Display',sz:16,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'111111'}},alignment:{vertical:'center',horizontal:'left'}};
+  const subtitleStyle={font:{name:'Aptos',sz:10,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'FF3D00'}},alignment:{vertical:'center',horizontal:'left'}};
+  const headerStyle={font:{name:'Aptos',sz:10,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'111111'}},alignment:{vertical:'center',horizontal:'center',wrapText:true},border};
+  const bodyStyle=(alternate)=>({font:{name:'Aptos',sz:10,color:{rgb:'222222'}},fill:{patternType:'solid',fgColor:{rgb:alternate?'F5F3EC':'FFFFFF'}},alignment:{vertical:'top',wrapText:true},border});
+  const totalStyle={font:{name:'Aptos',sz:10,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'FF3D00'}},alignment:{vertical:'center'},border};
+
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:lastCol}},{s:{r:1,c:0},e:{r:1,c:lastCol}}];
+  ws['!rows']=[{hpt:28},{hpt:21},{hpt:8},{hpt:28}];
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:3,c:0},e:{r:Math.max(3,lastRow),c:lastCol}})};
+  ws['!margins']={left:0.3,right:0.3,top:0.5,bottom:0.5,header:0.2,footer:0.2};
+
+  for(let c=0;c<=lastCol;c++){
+    const titleCell=ws[XLSX.utils.encode_cell({r:0,c})]||(ws[XLSX.utils.encode_cell({r:0,c})]={t:'s',v:''});
+    const subtitleCell=ws[XLSX.utils.encode_cell({r:1,c})]||(ws[XLSX.utils.encode_cell({r:1,c})]={t:'s',v:''});
+    titleCell.s=titleStyle; subtitleCell.s=subtitleStyle;
+    ws[XLSX.utils.encode_cell({r:3,c})].s=headerStyle;
+  }
+
+  rows.forEach((row,index)=>{
+    const r=index+4;
+    const isTotal=Object.values(row).some(v=>typeof v==='string'&&v.startsWith('TOTAL'));
+    for(let c=0;c<=lastCol;c++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})]; if(!cell) continue;
+      cell.s=isTotal?totalStyle:bodyStyle(index%2===1);
+      if(cell.t==='n') cell.s={...cell.s,numFmt:'#,##0',alignment:{...cell.s.alignment,horizontal:'right'}};
+      if(cell.t==='d') cell.s={...cell.s,numFmt:'dd/mm/yyyy',alignment:{...cell.s.alignment,horizontal:'center'}};
+    }
+    ws['!rows'][r]={hpt:isTotal?22:34};
+  });
+
+  ws['!cols']=headers.map((header,c)=>{
+    const values=[header,...rows.map(row=>row[header])];
+    let width=Math.max(...values.map(value=>{
+      if(value instanceof Date) return 12;
+      return String(value??'').length;
+    }),10)+2;
+    if(/Texto|Caption/.test(header)) width=Math.min(Math.max(width,30),55);
+    else width=Math.min(width,22);
+    return {wch:width};
+  });
+  return ws;
+}
+
 function exportXLSX(pageId){
   const data=cache[pageId]; if(!data?.posts?.length) return alert('Sin datos.');
   if(typeof XLSX==='undefined') return alert('La librería de Excel no cargó (revisa tu conexión a internet) — intenta de nuevo.');
@@ -50,8 +104,8 @@ function exportXLSX(pageId){
   const rowOf=(p,withRed)=>{
     const row={};
     if(withRed) row['Red']=p._plat;
-    row['Fecha']=fmtDate(p.created_time);
-    row['Hora']=p._dt.getHours()+':00';
+    row['Fecha']=new Date(p.created_time);
+    row['Hora']=String(p._dt.getHours()).padStart(2,'0')+':00';
     row['Día']=DAYS[p._dt.getDay()];
     row['Formato']=p._fmt;
     row['Pagado']=p._paid?'SI':'NO';
@@ -79,38 +133,41 @@ function exportXLSX(pageId){
   };
 
   const wb=XLSX.utils.book_new();
+  const pageName=pages.find(p=>p.id===pageId)?.name||'Social Dashboard';
+  const months=loadedMonthCount(data);
+  const generated=`Ventana: últimos ${months} meses · ${all.length} publicaciones · Generado el ${fmtDate(new Date())}`;
+  const baseHeaders=Object.keys(rowOf(all[0],false));
+  const generalHeaders=Object.keys(rowOf(all[0],true));
 
   const fbRows=fb.map(p=>rowOf(p,false)); if(fb.length) fbRows.push(totalRow('TOTAL FACEBOOK',fb,false));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(fbRows.length?fbRows:[{Fecha:'Sin datos'}]),'Facebook');
+  XLSX.utils.book_append_sheet(wb,styledExcelSheet(`${pageName} · FACEBOOK`,generated,baseHeaders,fbRows),'Facebook');
 
-  if(ig.length){
-    const igRows=ig.map(p=>rowOf(p,false)); igRows.push(totalRow('TOTAL INSTAGRAM',ig,false));
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(igRows),'Instagram');
-  }
+  const igRows=ig.map(p=>rowOf(p,false)); if(ig.length) igRows.push(totalRow('TOTAL INSTAGRAM',ig,false));
+  XLSX.utils.book_append_sheet(wb,styledExcelSheet(`${pageName} · INSTAGRAM`,generated,baseHeaders,igRows),'Instagram');
 
   const genRows=all.map(p=>rowOf(p,true)); genRows.push(totalRow('TOTAL GENERAL',all,true));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(genRows),'General');
+  XLSX.utils.book_append_sheet(wb,styledExcelSheet(`${pageName} · REPORTE GENERAL`,generated,generalHeaders,genRows),'General');
 
-  if(pairsHere.length){
-    const linkRows=pairsHere.map(pr=>{
-      const fp=byId[pr.fb], ip=byId[pr.ig];
-      return {
-        'FechaFB':fmtDate(fp.created_time),'FechaIG':fmtDate(ip.created_time),
-        'Formato':`${fp._fmt}/${ip._fmt}`,
-        'TextoFB':fp.message||'','TextoIG':ip.message||'',
-        'LikesFB':fp._likes,'LikesIG':ip._likes,
-        'LikesTotal':fp._likes+ip._likes,
-        'ComentariosTotal':fp._comments+ip._comments,
-        'CompartidosTotal':fp._shares+ip._shares,
-        'GuardadosTotal':(fp._saved||0)+(ip._saved||0),
-        'EngagementTotal':fp._eng+ip._eng,
-        'AlcanceTotal':(fp._reach||0)+(ip._reach||0),
-        'VideoViewsTotal':(fp._vviews||0)+(ip._vviews||0)
-      };
-    });
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(linkRows),'Vinculadas');
-  }
+  const linkRows=pairsHere.map(pr=>{
+    const fp=byId[pr.fb], ip=byId[pr.ig];
+    return {
+      'FechaFB':new Date(fp.created_time),'FechaIG':new Date(ip.created_time),
+      'Formato':`${fp._fmt}/${ip._fmt}`,
+      'TextoFB':fp.message||'','TextoIG':ip.message||'',
+      'LikesFB':fp._likes,'LikesIG':ip._likes,
+      'LikesTotal':fp._likes+ip._likes,
+      'ComentariosTotal':fp._comments+ip._comments,
+      'CompartidosTotal':fp._shares+ip._shares,
+      'GuardadosTotal':(fp._saved||0)+(ip._saved||0),
+      'EngagementTotal':fp._eng+ip._eng,
+      'AlcanceTotal':(fp._reach||0)+(ip._reach||0),
+      'VideoViewsTotal':(fp._vviews||0)+(ip._vviews||0)
+    };
+  });
+  const linkHeaders=['FechaFB','FechaIG','Formato','TextoFB','TextoIG','LikesFB','LikesIG','LikesTotal','ComentariosTotal','CompartidosTotal','GuardadosTotal','EngagementTotal','AlcanceTotal','VideoViewsTotal'];
+  XLSX.utils.book_append_sheet(wb,styledExcelSheet(`${pageName} · PIEZAS VINCULADAS`,generated,linkHeaders,linkRows),'Vinculadas');
 
-  const fname=`${(pages.find(p=>p.id===pageId)?.name||'datos').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
-  XLSX.writeFile(wb,fname);
+  wb.Props={Title:`Reporte social de ${pageName} · últimos ${months} meses`,Subject:`Analítica de Facebook e Instagram · ventana móvil de ${months} meses`,Author:'social.dashboard',CreatedDate:new Date()};
+  const fname=`${pageName.replace(/[^a-z0-9áéíóúñ]+/gi,'_')}_ultimos_${months}_meses_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,fname,{bookType:'xlsx',cellStyles:true,compression:true});
 }

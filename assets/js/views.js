@@ -20,7 +20,7 @@ function viewResumen(data){
     </div>
     <div class="chart-2col">
       <div class="card-box"><div class="card-hdr"><div class="card-title">Engagement en el Tiempo</div></div><canvas id="cTime"></canvas></div>
-      <div class="card-box"><div class="card-hdr"><div class="card-title">Crecimiento de Seguidores</div></div><div id="growthArea"></div></div>
+      <div class="card-box"><div class="card-hdr"><div class="card-title">Crecimiento de Seguidores</div>${growthYearControl(currentPage.id)}</div><div id="growthArea"></div></div>
     </div>`;
   drawTimeline(posts,'cTime');
   drawGrowth(currentPage.id);
@@ -51,7 +51,7 @@ function metricsDebugPanel(data){
 }
 
 function platTotalsTable(data){
-  const all=monthFilter?data.posts.filter(p=>monthFilter.has(monthKey(p._dt))):data.posts;
+  const all=monthFilter?data.posts.filter(p=>monthKey(p._dt)===monthFilter):data.posts;
   const fb=all.filter(p=>p._plat==='FB'), ig=all.filter(p=>p._plat==='IG');
   const S=(arr,k)=>arr.reduce((s,p)=>s+(p[k]||0),0);
   const row=(icon,name,arr)=>`<tr>
@@ -74,16 +74,34 @@ function platTotalsTable(data){
   </tbody></table>`;
 }
 
+function growthYearControl(pageId){
+  const years=[...new Set((LS.snaps[pageId]||[]).map(s=>s.date.slice(0,4)))].sort().reverse();
+  if(!years.length) years.push(String(new Date().getFullYear()));
+  if(!growthYear||!years.includes(String(growthYear))) growthYear=years[0];
+  return `<label class="period-control compact"><span>Año</span>
+    <select class="period-select" onchange="setGrowthYear(this.value)">
+      ${years.map(y=>`<option value="${y}" ${String(growthYear)===y?'selected':''}>${y}</option>`).join('')}
+    </select>
+  </label>`;
+}
+
+function setGrowthYear(year){ growthYear=String(year); drawGrowth(currentPage.id); }
+
 function drawGrowth(pageId){
-  const snaps=LS.snaps[pageId]||[];
+  const allSnaps=LS.snaps[pageId]||[];
   const area=document.getElementById('growthArea');
+  if(!area) return;
+  const years=[...new Set(allSnaps.map(s=>s.date.slice(0,4)))].sort().reverse();
+  if(!growthYear||!years.includes(String(growthYear))) growthYear=years[0]||String(new Date().getFullYear());
+  const snaps=allSnaps.filter(s=>s.date.startsWith(String(growthYear)+'-')).sort((a,b)=>a.date.localeCompare(b.date));
   if(snaps.length<2){
     area.innerHTML=`<div style="padding:30px 10px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6">
-      📅 Aún no hay histórico suficiente.<br>El dashboard guarda los números cada día que lo abres.<br>
+      📅 Aún no hay histórico suficiente en ${growthYear}.<br>El dashboard guarda los números cada día que lo abres.<br>
       <strong style="color:var(--text)">Snapshot de hoy guardado.</strong><br>Vuelve mañana para ver la primera línea de tendencia.</div>`;
     return;
   }
-  area.innerHTML=`<canvas id="cGrowth"></canvas>`;
+  const change=(snaps[snaps.length-1].fans||0)-(snaps[0].fans||0);
+  area.innerHTML=`<div class="growth-summary"><span>${fmt(snaps[0].fans)} iniciales</span><strong class="${change>=0?'positive':'negative'}">${change>=0?'+':''}${fmt(change)} en ${growthYear}</strong><span>${fmt(snaps[snaps.length-1].fans)} actuales</span></div><canvas id="cGrowth"></canvas>`;
   const c=document.getElementById('cGrowth');
   const W=c.parentElement.clientWidth,H=180; setupCanvas(c,W,H);
   const ctx=c.getContext('2d');
@@ -92,34 +110,133 @@ function drawGrowth(pageId){
 
 // ════════ VIEW: COMPARAR ════════
 function viewComparar(data){
-  let posts=getFiltered(P(data));
+  let scoped=data.posts;
+  if(platFilter==='fb') scoped=scoped.filter(p=>p._plat==='FB');
+  else if(platFilter==='ig') scoped=scoped.filter(p=>p._plat==='IG');
+  const months=[...new Set(scoped.map(p=>monthKey(p._dt)))].sort().reverse();
+  if(!compareMonthA||!months.includes(compareMonthA)) compareMonthA=(monthFilter&&months.includes(monthFilter)?monthFilter:months[0])||null;
+  if(compareMonthB&&(!months.includes(compareMonthB)||compareMonthB===compareMonthA)) compareMonthB=null;
+  const allFiltered=getFiltered(scoped);
+  const metric=COMPARE_CHART_METRICS[compareMetric]||COMPARE_CHART_METRICS.eng;
+  const chartOrderHelp=compareChartOrder==='chronological'
+    ? 'fecha de publicación · F=Facebook, I=Instagram'
+    : `${metric.label} · ${compareChartOrder==='desc'?'mayor a menor':'menor a mayor'}`;
+  const selected=new Set([compareMonthA,compareMonthB].filter(Boolean));
+  const chartPosts=compareMonthB?allFiltered.filter(p=>selected.has(monthKey(p._dt))):allFiltered;
+  let posts=chartPosts;
+  const periodLabel=loadedPeriodLabel(data).toLowerCase();
+  const periodPanel=compareMonthB?monthComparisonPanel(chartPosts,compareMonthA,compareMonthB):`<div class="insight compare-all-note"><span class="ico">📚</span>Mostrando juntas <strong>todas las publicaciones de los ${periodLabel}</strong>. Elige un segundo mes para activar la comparación VS.</div>`;
   const nSugg=suggestPairs(data).length;
   if(combineMode) posts=combinePairs(posts);
+  const monthATablePosts=compareMonthB?posts.filter(p=>monthKey(p._dt)===compareMonthA):[];
+  const monthBTablePosts=compareMonthB?posts.filter(p=>monthKey(p._dt)===compareMonthB):[];
   const combineInsight = combineMode ? `<div class="insight" style="margin-bottom:14px"><span class="ico">🔗</span>Mostrando ${LS.pairs.length} pieza(s) vinculada(s) como una sola fila (mismo día = automático, 1+ día = confirmado por ti). Los posts sin pareja quedan individuales.</div>` : '';
   document.getElementById('viewBody').innerHTML=`
+    <div class="compare-periods">
+      <label class="period-control"><span>Mes A (al comparar)</span>
+        <select class="period-select" onchange="setCompareMonth('a',this.value)">
+          ${months.map(k=>`<option value="${k}" ${compareMonthA===k?'selected':''}>${monthLabel(k)}</option>`).join('')}
+        </select>
+      </label>
+      <span class="compare-vs">VS</span>
+      <label class="period-control"><span>Comparar contra</span>
+        <select class="period-select" onchange="setCompareMonth('b',this.value)">
+          <option value="" ${!compareMonthB?'selected':''}>Sin comparación</option>
+          ${months.filter(k=>k!==compareMonthA).map(k=>`<option value="${k}" ${compareMonthB===k?'selected':''}>${monthLabel(k)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="period-control metric-control"><span>Qué miden las barras</span>
+        <select class="period-select" onchange="setCompareMetric(this.value)">
+          ${Object.entries(COMPARE_CHART_METRICS).map(([key,value])=>`<option value="${key}" ${compareMetric===key?'selected':''}>${value.label}</option>`).join('')}
+        </select>
+      </label>
+      <label class="period-control order-control"><span>Orden de barras y tablas</span>
+        <select class="period-select" onchange="setCompareChartOrder(this.value)">
+          <option value="chronological" ${compareChartOrder==='chronological'?'selected':''}>Por fecha</option>
+          <option value="desc" ${compareChartOrder==='desc'?'selected':''}>Mayor a menor · ${metric.label}</option>
+          <option value="asc" ${compareChartOrder==='asc'?'selected':''}>Menor a mayor · ${metric.label}</option>
+        </select>
+      </label>
+    </div>
+    ${periodPanel}
     ${combineInsight}
     <div class="card-box">
       <div class="card-hdr">
-        <div class="card-title">Comparativa de Publicaciones</div>
+        <div class="card-title">${compareMonthB?`${monthLabel(compareMonthA)} VS ${monthLabel(compareMonthB)}`:`Todas las publicaciones · ${periodLabel}`}</div>
         <div class="controls">
           <button class="ctrl-btn ${compareFilter==='todos'?'active':''}" onclick="setFilter('todos')">Todos</button>
           <button class="ctrl-btn ${compareFilter==='organico'?'active':''}" onclick="setFilter('organico')">🟢 Orgánico</button>
           <button class="ctrl-btn ${compareFilter==='pagado'?'active':''}" onclick="setFilter('pagado')">💰 Pagado</button>
           <button class="ctrl-btn ${combineMode?'active':''}" onclick="toggleCombine()">🔗 Ver piezas vinculadas</button>
           <button class="btn-report" onclick="openLinkModal()">🔗 Vincular piezas${nSugg?` (${nSugg})`:''}</button>
-          <button class="btn-export" onclick="exportXLSX('${currentPage.id}')">📥 Excel</button>
+          <button class="btn-export" onclick="exportXLSX('${currentPage.id}')" title="Incluye las publicaciones de todos los meses cargados">📥 Excel · ${loadedMonthCount(data)} meses</button>
         </div>
       </div>
-      <canvas id="cBars"></canvas>
+      <div class="chart-axis-guide"><span><strong>Eje X:</strong> ${chartOrderHelp}</span><span><strong>Eje Y:</strong> ${metric.label} · ${metric.help}</span></div>
+      ${compareMonthB?`<div class="compare-chart-grid">
+        <div class="compare-chart-panel"><div class="compare-chart-title">${monthLabel(compareMonthA)} <span>${chartPosts.filter(p=>monthKey(p._dt)===compareMonthA).length} posts</span></div><div class="compare-chart-metric">${metric.label}</div><canvas id="cBarsA"></canvas></div>
+        <div class="compare-chart-panel"><div class="compare-chart-title">${monthLabel(compareMonthB)} <span>${chartPosts.filter(p=>monthKey(p._dt)===compareMonthB).length} posts</span></div><div class="compare-chart-metric">${metric.label}</div><canvas id="cBarsB"></canvas></div>
+      </div>`:'<canvas id="cBars"></canvas>'}
     </div>
-    <div class="card-box">
+    ${compareMonthB?`<div class="compare-table-grid">
+      <div class="card-box compare-table-card">
+        <div class="card-hdr"><div class="card-title">Publicaciones · ${monthLabel(compareMonthA)}</div><span class="mini-table-count">${monthATablePosts.length} posts</span></div>
+        <div class="tbl-wrap mini-compare-table" id="tblWrapA"></div>
+      </div>
+      <div class="card-box compare-table-card">
+        <div class="card-hdr"><div class="card-title">Publicaciones · ${monthLabel(compareMonthB)}</div><span class="mini-table-count">${monthBTablePosts.length} posts</span></div>
+        <div class="tbl-wrap mini-compare-table" id="tblWrapB"></div>
+      </div>
+    </div>`:`<div class="card-box">
       <div class="card-hdr"><div class="card-title">Tabla Comparativa — clic en encabezado para ordenar</div></div>
       <div class="tbl-wrap" id="tblWrap"></div>
-    </div>`;
-  drawBars(posts,'cBars');
-  renderTable(posts);
+    </div>`}`;
+  if(compareMonthB){
+    const monthAPosts=chartPosts.filter(p=>monthKey(p._dt)===compareMonthA);
+    const monthBPosts=chartPosts.filter(p=>monthKey(p._dt)===compareMonthB);
+    const sharedMax=Math.max(...chartPosts.map(p=>p[metric.key]||0),1);
+    drawBars(monthAPosts,'cBarsA',metric.key,sharedMax,compareChartOrder);
+    drawBars(monthBPosts,'cBarsB',metric.key,sharedMax,compareChartOrder);
+    renderMonthCompareTable(monthATablePosts,'tblWrapA',metric);
+    renderMonthCompareTable(monthBTablePosts,'tblWrapB',metric);
+  }else{
+    drawBars(chartPosts,'cBars',metric.key,null,compareChartOrder);
+    renderTable(posts);
+  }
 }
 function toggleCombine(){ combineMode=!combineMode; renderView(); }
+function setCompareMetric(metric){ if(COMPARE_CHART_METRICS[metric]) compareMetric=metric; renderView(); }
+function setCompareChartOrder(order){ if(['chronological','desc','asc'].includes(order)) compareChartOrder=order; renderView(); }
+
+function setCompareMonth(which,value){
+  if(which==='a'){
+    compareMonthA=value||null;
+    if(compareMonthB===compareMonthA) compareMonthB=null;
+  }else compareMonthB=value||null;
+  renderView();
+}
+
+function monthComparisonPanel(posts,a,b){
+  const summarize=month=>{
+    const rows=posts.filter(p=>monthKey(p._dt)===month);
+    const sum=k=>rows.reduce((total,p)=>total+(p[k]||0),0);
+    return {posts:rows.length,eng:Math.round(avg(rows.map(p=>p._eng))),reach:sum('_reach'),views:sum('_vviews')};
+  };
+  const left=summarize(a),right=summarize(b);
+  const delta=(current,base)=>base?Math.round((current-base)/base*100):null;
+  const cell=(label,key)=>{
+    const d=delta(left[key],right[key]);
+    return `<div class="month-compare-card">
+      <div class="month-compare-label">${label}</div>
+      <div class="month-compare-values"><strong>${fmt(left[key])}</strong><span>${fmt(right[key])}</span></div>
+      <div class="month-delta ${d===null?'neutral':d>=0?'positive':'negative'}">${d===null?'Sin base':`${d>=0?'+':''}${d}%`} <small>${monthLabel(a)} vs ${monthLabel(b)}</small></div>
+    </div>`;
+  };
+  return `<div class="month-compare-summary">
+    <div class="month-compare-head"><strong>${monthLabel(a)}</strong><span>comparado con</span><strong>${monthLabel(b)}</strong></div>
+    <div class="month-compare-grid">${cell('Publicaciones','posts')}${cell('Eng. promedio','eng')}${cell('Alcance total','reach')}${cell('Views totales','views')}</div>
+  </div>`;
+}
 
 const LINK_WINDOW_DAYS=3; // ventana para sugerir candidatos FB/IG como misma pieza
 
@@ -282,9 +399,33 @@ function renderTable(posts){
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function renderMonthCompareTable(posts,targetId,metric){
+  const sorted=orderComparePosts(posts,metric.key,compareChartOrder);
+  const platform=p=>p._plat==='IG'?'📸':p._plat==='FB'?'📘':'📘📸';
+  const rows=sorted.map(p=>{
+    const fmtTag=`tag-${p._fmt.toLowerCase().replace('á','a')}`;
+    const value=p[metric.key]||0;
+    return `<tr>
+      <td class="mini-date">${fmtDate(p.created_time)}</td>
+      <td class="mini-platform" title="${p._plat}">${platform(p)}${p._paid?' 💰':''}</td>
+      <td class="mini-content"><span class="tag ${fmtTag}">${p._fmt}</span><span title="${esc(p.message||'Sin texto')}">${esc(p.message||'Sin texto')}</span></td>
+      <td class="td-num mini-metric">${fmt(value)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById(targetId).innerHTML=`<table>
+    <thead><tr><th>Fecha</th><th>Red</th><th>Contenido</th><th>${metric.label}</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="mini-empty">Sin publicaciones</td></tr>'}</tbody>
+  </table>`;
+}
+
 function sortBy(col){
   if(sortState.col===col) sortState.dir=sortState.dir==='desc'?'asc':'desc';
   else { sortState.col=col; sortState.dir='desc'; }
+  const chartMetric={likes:'likes',comments:'comments',shares:'shares',eng:'eng',reach:'reach',vviews:'views'}[col];
+  if(chartMetric){
+    compareMetric=chartMetric;
+    compareChartOrder=sortState.dir;
+  }
   renderView();
 }
 function sortPosts(posts){

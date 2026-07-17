@@ -12,7 +12,21 @@ let cache={};                    // {pageId: {posts, fans, platform}}
 let sortState={col:'eng',dir:'desc'};
 let compareFilter='todos';       // todos | organico | pagado
 let combineMode=false;           // muestra piezas vinculadas manualmente (FB+IG confirmadas) combinadas en una fila
-let monthFilter=null;            // null=todos los posts cacheados; Set de 'YYYY-MM' si hay mes(es) elegido(s)
+let monthFilter=null;            // null=todos los posts cacheados; 'YYYY-MM' para un solo mes
+let compareMonthA=null;           // mes principal de Comparar Posts
+let compareMonthB=null;           // segundo mes opcional de Comparar Posts
+let compareMetric='eng';           // métrica visible en las barras de Comparar Posts
+let compareChartOrder='chronological'; // chronological | desc | asc
+let growthYear=null;              // año visible en Crecimiento de Seguidores
+
+const COMPARE_CHART_METRICS={
+  eng:{key:'_eng',label:'Engagement total',help:'Likes + comentarios + compartidos'},
+  likes:{key:'_likes',label:'Likes',help:'Cantidad de Me gusta por publicación'},
+  comments:{key:'_comments',label:'Comentarios',help:'Cantidad de comentarios por publicación'},
+  shares:{key:'_shares',label:'Compartidos',help:'Veces que se compartió cada publicación'},
+  reach:{key:'_reach',label:'Alcance',help:'Personas o cuentas alcanzadas'},
+  views:{key:'_vviews',label:'Reproducciones',help:'Views o plays registrados por Meta'}
+};
 
 const GOALS={
   reach:{label:'Alcance',metric:'_reach'},
@@ -38,6 +52,7 @@ const LS={
   personas:JSON.parse(localStorage.getItem('sd_personas')||'{}'), // {pageId:[buyer persona]}
   labDrafts:JSON.parse(localStorage.getItem('sd_lab_drafts')||'{}'),
   outcomes:JSON.parse(localStorage.getItem('sd_outcomes')||'{}'), // {postId:{messages,leads,sales,revenue}}
+  metricSupport:JSON.parse(localStorage.getItem('sd_metric_support')||'{}'), // compatibilidad de métricas por página durante 24h
   save(){
     localStorage.setItem('sd_paid',JSON.stringify(this.paid));
     localStorage.setItem('sd_snaps',JSON.stringify(this.snaps));
@@ -46,6 +61,7 @@ const LS={
     localStorage.setItem('sd_personas',JSON.stringify(this.personas));
     localStorage.setItem('sd_lab_drafts',JSON.stringify(this.labDrafts));
     localStorage.setItem('sd_outcomes',JSON.stringify(this.outcomes));
+    localStorage.setItem('sd_metric_support',JSON.stringify(this.metricSupport));
   }
 };
 
