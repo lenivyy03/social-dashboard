@@ -8,17 +8,19 @@ function drawTimeline(posts,id){
   barChartLabeled(c.getContext('2d'),W,H,sorted.map(p=>p._eng),sorted.map(p=>`${String(p._dt.getDate()).padStart(2,'0')}/${String(p._dt.getMonth()+1).padStart(2,'0')}`),'#111111',sorted.map(p=>p._paid));
 }
 
-function drawBars(posts,id){
+function drawBars(posts,id,metricKey='_eng',maxOverride=null){
   const c=document.getElementById(id); if(!c)return;
-  const sorted=sortPosts(posts);
+  // La tabla puede ordenarse por rendimiento; la gráfica siempre conserva el tiempo.
+  const sorted=[...posts].sort((a,b)=>a._dt-b._dt||String(a._plat).localeCompare(String(b._plat)));
   const W=c.parentElement.clientWidth-36,H=220; setupCanvas(c,W,H);
-  barChartLabeled(c.getContext('2d'),W,H,sorted.map(p=>p._eng),sorted.map(p=>`${String(p._dt.getDate()).padStart(2,'0')}/${String(p._dt.getMonth()+1).padStart(2,'0')}`),'#111111',sorted.map(p=>p._paid));
+  barChartLabeled(c.getContext('2d'),W,H,sorted.map(p=>p[metricKey]||0),sorted.map(p=>`${String(p._dt.getDate()).padStart(2,'0')}/${String(p._dt.getMonth()+1).padStart(2,'0')}·${p._plat==='IG'?'I':'F'}`),'#111111',sorted.map(p=>p._paid),maxOverride);
 }
 
-function barChartLabeled(ctx,W,H,data,labels,color,paidArr){
+function barChartLabeled(ctx,W,H,data,labels,color,paidArr,maxOverride=null){
   const pad={t:12,b:30,l:38,r:8},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
-  const max=Math.max(...data,1);
-  const bW=Math.max(4,Math.min(26,cW/data.length-3)),gap=cW/data.length;
+  const max=Math.max(maxOverride||0,...data,1),count=Math.max(data.length,1);
+  const bW=Math.max(4,Math.min(26,cW/count-3)),gap=cW/count;
+  const labelStep=Math.max(1,Math.ceil(data.length/8));
   ctx.clearRect(0,0,W,H);
   for(let i=0;i<=4;i++){const y=pad.t+(cH/4)*i;ctx.strokeStyle='rgba(17,17,17,0.12)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillStyle='#8a8a8a';ctx.font='9px Share Tech Mono';ctx.textAlign='right';ctx.fillText(fmt(Math.round(max*(1-i/4))),pad.l-4,y+3);}
   data.forEach((v,i)=>{
@@ -28,7 +30,8 @@ function barChartLabeled(ctx,W,H,data,labels,color,paidArr){
     const r=Math.min(3,bW/2);
     ctx.beginPath();ctx.moveTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.arcTo(x+bW,y,x+bW,y+r,r);ctx.lineTo(x+bW,pad.t+cH);ctx.lineTo(x,pad.t+cH);ctx.closePath();ctx.fill();
     ctx.globalAlpha=1;
-    if(data.length<=18||i%Math.ceil(data.length/12)===0){ctx.fillStyle='#8a8a8a';ctx.font='8px Share Tech Mono';ctx.textAlign='center';ctx.fillText(labels[i],x+bW/2,H-4);}
+    if(data.length<=8&&v>0){ctx.fillStyle='#444';ctx.font='8px JetBrains Mono';ctx.textAlign='center';ctx.fillText(fmt(v),x+bW/2,Math.max(pad.t+8,y-4));}
+    if(i%labelStep===0||i===data.length-1){ctx.fillStyle='#8a8a8a';ctx.font='8px JetBrains Mono';ctx.textAlign='center';ctx.fillText(labels[i],x+bW/2,H-4);}
   });
   if(Array.isArray(paidArr)){ctx.fillStyle='#ff3d00';ctx.fillRect(W-pad.r-70,pad.t,8,8);ctx.fillStyle='#8a8a8a';ctx.font='9px Share Tech Mono';ctx.textAlign='left';ctx.fillText('= pagado',W-pad.r-58,pad.t+8);}
 }
@@ -45,4 +48,3 @@ function lineChart(ctx,W,H,data,labels,color,fill){
   const step=Math.max(1,Math.ceil(data.length/8));
   labels.forEach((l,i)=>{if(i%step===0||i===data.length-1){ctx.fillStyle='#8a8a8a';ctx.font='8px Share Tech Mono';ctx.textAlign='center';ctx.fillText(l,px(i),H-4);}});
 }
-

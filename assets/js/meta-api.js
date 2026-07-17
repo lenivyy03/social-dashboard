@@ -1,54 +1,84 @@
 // ── Load data (FB + insights) ──
-async function loadPageData(pageId){
+// Ventana visible: mes calendario actual + los tres meses anteriores.
+// Ejemplo: durante julio se conservan publicaciones desde el 1 de abril.
+function recentPostsCutoff(now=new Date()){
+  return new Date(now.getFullYear(),now.getMonth()-3,1,0,0,0,0);
+}
+function filterRecentPosts(posts,now=new Date()){
+  const cutoff=recentPostsCutoff(now).getTime();
+  return posts.filter(p=>new Date(p.created_time).getTime()>=cutoff);
+}
+function shouldContinueRecentPaging(posts,now=new Date()){
+  if(!posts.length) return false;
+  const cutoff=recentPostsCutoff(now).getTime();
+  return posts.every(p=>new Date(p.created_time).getTime()>=cutoff);
+}
+
+function prepareLoadedPosts(posts){
+  posts.forEach(p=>{
+    if(p._plat==='FB'){
+      p._likes=p.likes?.summary?.total_count||p._likes||0;
+      p._comments=p.comments?.summary?.total_count||p._comments||0;
+      p._shares=p.shares?.count||p._shares||0;
+    }
+    for(const key of ['_impr','_clicks','_vviews','_reach','_saved','_totalInteractions','_watchTime','_avgWatchTime','_replays','_skipRate','_profileVisits','_follows']) if(p[key]===undefined) p[key]=0;
+    p._eng=(p._likes||0)+(p._comments||0)+(p._shares||0);
+    p._dt=new Date(p.created_time);
+    p._paid=!!LS.paid[p.id];
+  });
+  return posts.sort((a,b)=>b._dt-a._dt);
+}
+
+async function loadPageData(pageId,onProgress){
   if(cache[pageId]) return;
+  try{
+    const saved=await getPageDataCache(pageId);
+    if(saved){
+      cache[pageId]=saved; recordSnapshot(pageId,saved.fans,saved.posts); onProgress?.('cache');
+      // Si ya cubre toda la ventana, dos horas de caché bastan. Si aún había
+      // paginación, se muestra al instante y se actualiza en segundo plano.
+      if(saved.completeWindow) return;
+    }
+  }catch(e){ console.warn('Caché local no disponible:',e.message); }
   const t=window._pt[pageId]||TOKEN;
   const page=pages.find(p=>p.id===pageId);
   const igId=page?.instagram_business_account?.id||null;
   const debug={fb:[],fbVideo:[],igPhoto:[],igVideo:[]}; // qué métricas respondieron OK, para diagnóstico
 
-  // ── FACEBOOK (primeras 50 — carga inicial rápida; el resto se trae bajo demanda
-  // con "Cargar publicaciones más viejas" usando el cursor de paginación de Meta) ──
-  const [pr,pi]=await Promise.all([
+  const facebookBase=Promise.all([
     api(`/${pageId}/posts?fields=id,message,created_time,full_picture,status_type,attachments{media_type,type},likes.summary(true),comments.summary(true),shares&limit=50`,t),
     api(`/${pageId}?fields=fan_count,followers_count`,t)
   ]);
-  const fbPosts=pr.data||[];
+  const instagramBase=igId?Promise.all([
+    api(`/${igId}/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,like_count,comments_count&limit=50`,t),
+    api(`/${igId}?fields=followers_count`,t)
+  ]).then(([mr,ii])=>({mr,ii})).catch(e=>{console.warn('IG no cargo:',e.message);return {mr:{data:[],paging:{}},ii:{}};}):Promise.resolve({mr:{data:[],paging:{}},ii:{}});
+
+  // Facebook e Instagram arrancan al mismo tiempo.
+  const [[pr,pi],{mr,ii}]=await Promise.all([facebookBase,instagramBase]);
+  const fbRaw=pr.data||[];
+  const fbPosts=filterRecentPosts(fbRaw);
   fbPosts.forEach(p=>{ p._plat='FB'; p._fmt=getFormat(p); });
-  const fbDebug=await enrichFBPosts(fbPosts,t);
+  const igRaw=(mr.data||[]).map(igMediaToPost);
+  const igPosts=filterRecentPosts(igRaw);
+  const posts=prepareLoadedPosts(filterRecentPosts([...fbPosts,...igPosts]));
+  const fans=pi.fan_count||pi.followers_count||0,igFans=ii.followers_count||0;
+  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,paging:{fb:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null,ig:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null},loadingMore:false,metricsLoading:true,fromCache:false};
+  onProgress?.('base');
+
+  // Las métricas de ambas redes se completan en paralelo mientras la interfaz ya es visible.
+  const [fbDebug,igDebug]=await Promise.all([enrichFBPosts(fbPosts,t,pageId),enrichIGPosts(igPosts,t,pageId)]);
   debug.fb=fbDebug.fb; debug.fbVideo=fbDebug.fbVideo;
-
-  // ── INSTAGRAM (primeras 50, mismo esquema de paginación bajo demanda) ──
-  let igPosts=[], igFans=0, igPagingNext=null;
-  if(igId){
-    try{
-      const [mr,ii]=await Promise.all([
-        api(`/${igId}/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,like_count,comments_count&limit=50`,t),
-        api(`/${igId}?fields=followers_count`,t)
-      ]);
-      igFans=ii.followers_count||0;
-      igPosts=(mr.data||[]).map(igMediaToPost);
-      const igDebug=await enrichIGPosts(igPosts,t);
-      debug.igPhoto=igDebug.igPhoto; debug.igVideo=igDebug.igVideo;
-      igPagingNext=mr.paging?.next||null;
-    }catch(e){ console.warn('IG no cargo:',e.message); }
-  }
-
-  // ── MERGE ──
-  const posts=[...fbPosts,...igPosts];
-  posts.forEach(p=>{
-    p._eng=(p._likes||0)+(p._comments||0)+(p._shares||0);
-    p._dt=new Date(p.created_time);
-    p._paid=!!LS.paid[p.id];
-  });
-  posts.sort((a,b)=>b._dt-a._dt);
+  debug.igPhoto=igDebug.igPhoto; debug.igVideo=igDebug.igVideo;
+  prepareLoadedPosts(posts);
+  cache[pageId].metricsLoading=false;
 
   // Piezas del MISMO día se vinculan automático (en la práctica casi nunca falla).
   // Diferencias de 1+ día siguen pidiendo confirmación manual en "Vincular piezas".
   autoLinkSameDay(fbPosts,igPosts);
 
-  const fans=pi.fan_count||pi.followers_count||0;
-  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,paging:{fb:pr.paging?.next||null,ig:igPagingNext},loadingMore:false};
   recordSnapshot(pageId,fans,posts);
+  savePageDataCache(pageId,cache[pageId]).catch(e=>console.warn('No se guardó la caché:',e.message));
 }
 
 function igMediaToPost(m){
@@ -69,14 +99,20 @@ function igMediaToPost(m){
 
 // Prueba y trae insights de Facebook para un lote de posts (mutan in-place). Reutilizable
 // tanto para la carga inicial como para los lotes de "cargar más viejas".
-async function enrichFBPosts(fbPosts,t){
+async function enrichFBPosts(fbPosts,t,pageId='global'){
   // Meta deprecó post_impressions/post_impressions_unique/post_video_views (nov 2025 y jun 2026).
   // Reemplazo oficial: post_media_view. Probamos varias candidatas y usamos las que sí respondan.
   // 'post_activity_by_action_type' es un desglose por tipo de acción que puede incluir "save" —
   // es experimental, si no existe simplemente no se usa (el probe la descarta sola).
-  let fbMetrics=[];
-  if(fbPosts.length) fbMetrics=await probeMetrics(sampleIds(fbPosts),['post_impressions_unique','post_impressions','post_media_view','post_clicks','post_activity_by_action_type'],t);
-  const ins=await batchInsights(fbPosts.map(p=>p.id),fbMetrics,t);
+  const fbVids=fbPosts.filter(p=>p._fmt==='Video');
+  const [fbMetrics,fbVideoMetrics]=await Promise.all([
+    fbPosts.length?supportedMetrics(`${pageId}:fb`,sampleIds(fbPosts),['post_impressions_unique','post_impressions','post_media_view','post_clicks','post_activity_by_action_type'],t):[],
+    fbVids.length?supportedMetrics(`${pageId}:fb-video`,sampleIds(fbVids),['post_video_views','post_media_view'],t):[]
+  ]);
+  const [ins,vi]=await Promise.all([
+    batchInsights(fbPosts.map(p=>p.id),fbMetrics,t),
+    batchInsights(fbVids.map(p=>p.id),fbVideoMetrics,t)
+  ]);
   fbPosts.forEach((p,i)=>{
     p._ins=ins[i]||{};
     p._reach=p._ins.post_impressions_unique||p._ins.post_impressions||p._ins.post_media_view||0;
@@ -88,14 +124,8 @@ async function enrichFBPosts(fbPosts,t){
     p._comments=p.comments?.summary?.total_count||0;
     p._shares=p.shares?.count||0;
   });
-  let fbVideoMetrics=[];
-  const fbVids=fbPosts.filter(p=>p._fmt==='Video');
   if(fbVids.length){
-    fbVideoMetrics=await probeMetrics(sampleIds(fbVids),['post_video_views','post_media_view'],t);
-    if(fbVideoMetrics.length){
-      const vi=await batchInsights(fbVids.map(p=>p.id),fbVideoMetrics,t);
-      fbVids.forEach((p,i)=>{ p._vviews=vi[i]?.post_video_views||vi[i]?.post_media_view||0; });
-    }
+    fbVids.forEach((p,i)=>{ p._vviews=vi[i]?.post_video_views||vi[i]?.post_media_view||0; });
     // Si no hubo métrica de video dedicada, al menos usa post_media_view ya obtenido arriba
     fbVids.forEach(p=>{ if(!p._vviews && p._ins?.post_media_view) p._vviews=p._ins.post_media_view; });
   }
@@ -105,14 +135,18 @@ async function enrichFBPosts(fbPosts,t){
 // Igual que enrichFBPosts pero para Instagram — separa foto/álbum vs video porque
 // Meta permite distintas métricas según el tipo de contenido (reach puede vivir en
 // fotos y estar muerto en Reels, o viceversa).
-async function enrichIGPosts(igPosts,t){
+async function enrichIGPosts(igPosts,t,pageId='global'){
   const igNoVid=igPosts.filter(p=>p._fmt!=='Video');
   const igVidAll=igPosts.filter(p=>p._fmt==='Video');
-  let igMetricsPhoto=[], igMetricsVideo=[];
-  if(igNoVid.length) igMetricsPhoto=await probeMetrics(sampleIds(igNoVid),IG_COMMON_METRICS,t);
-  if(igVidAll.length) igMetricsVideo=await probeMetrics(sampleIds(igVidAll),[...IG_COMMON_METRICS,...IG_VIDEO_EXTRA_METRICS],t);
+  const [igMetricsPhoto,igMetricsVideo]=await Promise.all([
+    igNoVid.length?supportedMetrics(`${pageId}:ig-photo`,sampleIds(igNoVid),IG_COMMON_METRICS,t):[],
+    igVidAll.length?supportedMetrics(`${pageId}:ig-video`,sampleIds(igVidAll),[...IG_COMMON_METRICS,...IG_VIDEO_EXTRA_METRICS],t):[]
+  ]);
+  const [insP,insV]=await Promise.all([
+    batchInsights(igNoVid.map(p=>p.id),igMetricsPhoto,t),
+    batchInsights(igVidAll.map(p=>p.id),igMetricsVideo,t)
+  ]);
   if(igNoVid.length){
-    const insP=await batchInsights(igNoVid.map(p=>p.id),igMetricsPhoto,t);
     igNoVid.forEach((p,i)=>{
       p._ins=insP[i]||{};
       p._reach=p._ins.reach||p._ins.impressions||0;
@@ -125,7 +159,6 @@ async function enrichIGPosts(igPosts,t){
     });
   }
   if(igVidAll.length){
-    const insV=await batchInsights(igVidAll.map(p=>p.id),igMetricsVideo,t);
     igVidAll.forEach((p,i)=>{
       p._ins=insV[i]||{};
       p._reach=p._ins.reach||0;
@@ -144,8 +177,8 @@ async function enrichIGPosts(igPosts,t){
   return {igPhoto:igMetricsPhoto,igVideo:igMetricsVideo};
 }
 
-// Trae el siguiente lote (más viejo) de FB y/o IG usando el cursor "paging.next" que
-// ya trae Meta en la respuesta — no hace falta reconstruir la URL a mano.
+// Trae el siguiente lote de FB y/o IG usando el cursor "paging.next" que ya trae Meta.
+// Descarta lo anterior a la ventana de cuatro meses y deja de paginar al cruzarla.
 async function loadMorePosts(pageId){
   const data=cache[pageId];
   if(!data||data.loadingMore) return;
@@ -153,32 +186,37 @@ async function loadMorePosts(pageId){
   const t=window._pt[pageId]||TOKEN;
   data.loadingMore=true; renderView();
   try{
-    let newFb=[], newIg=[];
-    if(data.paging.fb){
+    const fbTask=data.paging.fb?(async()=>{
       const pr=await apiUrl(data.paging.fb);
-      newFb=pr.data||[];
+      const fbRaw=pr.data||[];
+      const newFb=filterRecentPosts(fbRaw);
       newFb.forEach(p=>{ p._plat='FB'; p._fmt=getFormat(p); });
-      const fbDebug=await enrichFBPosts(newFb,t);
-      data.debug.fb=[...new Set([...data.debug.fb,...fbDebug.fb])];
-      data.debug.fbVideo=[...new Set([...data.debug.fbVideo,...fbDebug.fbVideo])];
-      data.paging.fb=pr.paging?.next||null;
-    }
-    if(data.paging.ig){
+      const fbDebug=await enrichFBPosts(newFb,t,pageId);
+      return {posts:newFb,debug:fbDebug,next:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null};
+    })():Promise.resolve({posts:[],debug:{fb:[],fbVideo:[]},next:null});
+    const igTask=data.paging.ig?(async()=>{
       const mr=await apiUrl(data.paging.ig);
-      newIg=(mr.data||[]).map(igMediaToPost);
-      const igDebug=await enrichIGPosts(newIg,t);
-      data.debug.igPhoto=[...new Set([...data.debug.igPhoto,...igDebug.igPhoto])];
-      data.debug.igVideo=[...new Set([...data.debug.igVideo,...igDebug.igVideo])];
-      data.paging.ig=mr.paging?.next||null;
-    }
+      const igRaw=(mr.data||[]).map(igMediaToPost);
+      const newIg=filterRecentPosts(igRaw);
+      const igDebug=await enrichIGPosts(newIg,t,pageId);
+      return {posts:newIg,debug:igDebug,next:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null};
+    })():Promise.resolve({posts:[],debug:{igPhoto:[],igVideo:[]},next:null});
+    const [fbResult,igResult]=await Promise.all([fbTask,igTask]);
+    const newFb=fbResult.posts,newIg=igResult.posts;
+    data.debug.fb=[...new Set([...data.debug.fb,...fbResult.debug.fb])];
+    data.debug.fbVideo=[...new Set([...data.debug.fbVideo,...fbResult.debug.fbVideo])];
+    data.debug.igPhoto=[...new Set([...data.debug.igPhoto,...igResult.debug.igPhoto])];
+    data.debug.igVideo=[...new Set([...data.debug.igVideo,...igResult.debug.igVideo])];
+    data.paging.fb=fbResult.next; data.paging.ig=igResult.next;
     [...newFb,...newIg].forEach(p=>{
       p._eng=(p._likes||0)+(p._comments||0)+(p._shares||0);
       p._dt=new Date(p.created_time);
       p._paid=!!LS.paid[p.id];
     });
-    data.posts=[...data.posts,...newFb,...newIg].sort((a,b)=>b._dt-a._dt);
+    data.posts=filterRecentPosts([...data.posts,...newFb,...newIg]).sort((a,b)=>b._dt-a._dt);
     autoLinkSameDay(data.posts.filter(p=>p._plat==='FB'),data.posts.filter(p=>p._plat==='IG'));
     recordSnapshot(pageId,data.fans,data.posts);
+    savePageDataCache(pageId,data).catch(e=>console.warn('No se guardó la caché:',e.message));
   }catch(e){ alert('No se pudieron cargar más publicaciones: '+e.message); }
   data.loadingMore=false;
   renderView();
@@ -253,6 +291,20 @@ async function probeMetrics(sampleIdOrIds,candidates,token){
     }catch{}
   }
   return [...valid];
+}
+
+// La compatibilidad de métricas cambia poco: recordarla por 24h evita repetir hasta
+// 12 solicitudes de diagnóstico en cada apertura sin ocultar futuras depreciaciones.
+const METRIC_SUPPORT_TTL_MS=24*60*60*1000;
+async function supportedMetrics(key,sampleIdsValue,candidates,token){
+  const cacheKey=`v25:${key}`;
+  const saved=LS.metricSupport[cacheKey];
+  if(saved&&Date.now()-saved.savedAt<METRIC_SUPPORT_TTL_MS&&Array.isArray(saved.metrics)){
+    return saved.metrics.filter(metric=>candidates.includes(metric));
+  }
+  const metrics=await probeMetrics(sampleIdsValue,candidates,token);
+  if(metrics.length){ LS.metricSupport[cacheKey]={savedAt:Date.now(),metrics}; LS.save(); }
+  return metrics;
 }
 
 // Elige hasta 3 posts representativos (primero, medio, último) para probar métricas

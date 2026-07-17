@@ -7,15 +7,18 @@ function recordSnapshot(pageId,fans,posts){
   const existing=arr.find(s=>s.date===today);
   if(existing){ existing.fans=fans; existing.avgEng=avgEng; }
   else arr.push({date:today,fans,avgEng});
-  if(arr.length>180) LS.snaps[pageId]=arr.slice(-180);
+  // Conserva algo más de un año para poder consultar la tendencia anual completa.
+  if(arr.length>400) LS.snaps[pageId]=arr.slice(-400);
   LS.save();
   recordPostSnapshots(pageId,posts).catch(e=>console.warn('No se guardaron snapshots por post:',e));
 }
 
 // Los snapshots por publicación pueden crecer bastante: IndexedDB evita saturar localStorage.
 const ANALYTICS_DB='social_dashboard_analytics';
-const ANALYTICS_DB_VERSION=1;
+const ANALYTICS_DB_VERSION=2;
 const POST_SNAPSHOT_STORE='postSnapshots';
+const PAGE_CACHE_STORE='pageCache';
+const PAGE_CACHE_TTL_MS=2*60*60*1000;
 
 function openAnalyticsDB(){
   return new Promise((resolve,reject)=>{
@@ -29,10 +32,43 @@ function openAnalyticsDB(){
         store.createIndex('postId','postId',{unique:false});
         store.createIndex('capturedAt','capturedAt',{unique:false});
       }
+      if(!db.objectStoreNames.contains(PAGE_CACHE_STORE)) db.createObjectStore(PAGE_CACHE_STORE,{keyPath:'pageId'});
     };
     req.onsuccess=()=>resolve(req.result);
     req.onerror=()=>reject(req.error||new Error('No se pudo abrir el histórico.'));
   });
+}
+
+// Caché temporal y local del dispositivo. Nunca guarda tokens ni URLs de paginación.
+async function savePageDataCache(pageId,data){
+  if(!data?.posts) return;
+  const db=await openAnalyticsDB();
+  const tx=db.transaction(PAGE_CACHE_STORE,'readwrite');
+  tx.objectStore(PAGE_CACHE_STORE).put({
+    pageId:String(pageId),savedAt:Date.now(),
+    data:{posts:data.posts,fans:data.fans||0,igFans:data.igFans||0,hasIG:!!data.hasIG,debug:data.debug||{fb:[],fbVideo:[],igPhoto:[],igVideo:[]},completeWindow:!data.paging?.fb&&!data.paging?.ig}
+  });
+  await transactionDone(tx); db.close();
+}
+
+async function getPageDataCache(pageId){
+  const db=await openAnalyticsDB();
+  const tx=db.transaction(PAGE_CACHE_STORE,'readonly');
+  const done=transactionDone(tx);
+  const req=tx.objectStore(PAGE_CACHE_STORE).get(String(pageId));
+  const record=await new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});
+  await done; db.close();
+  if(!record||Date.now()-record.savedAt>PAGE_CACHE_TTL_MS) return null;
+  const data=record.data;
+  data.posts=filterRecentPosts(data.posts||[]).map(p=>({...p,_dt:new Date(p.created_time),_paid:!!LS.paid[p.id]}));
+  return {...data,paging:{fb:null,ig:null},loadingMore:false,fromCache:true,cachedAt:record.savedAt};
+}
+
+async function clearPageDataCache(){
+  const db=await openAnalyticsDB();
+  const tx=db.transaction(PAGE_CACHE_STORE,'readwrite');
+  tx.objectStore(PAGE_CACHE_STORE).clear();
+  await transactionDone(tx); db.close();
 }
 
 function postSnapshotRecord(pageId,p,capturedAt){
