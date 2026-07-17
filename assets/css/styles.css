@@ -192,6 +192,19 @@ details.card-box[open] summary::before{content:'▾ '}
 .compare-chart-title{font-family:'Space Grotesk';font-size:12px;font-weight:700;text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px}
 .compare-chart-title span{font-family:'JetBrains Mono';font-size:9px;color:var(--muted);font-weight:500}
 .compare-chart-metric{font-size:9px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.7px;margin:-3px 0 8px}
+.compare-table-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.compare-table-card{min-width:0}
+.mini-table-count{font-size:9px;color:var(--muted);text-transform:uppercase}
+.mini-compare-table table{min-width:430px;font-size:10px}
+.mini-compare-table th{padding:8px;cursor:default;font-size:9px}
+.mini-compare-table td{padding:8px}
+.mini-date{white-space:nowrap;color:var(--muted);width:82px}
+.mini-platform{text-align:center;white-space:nowrap;width:48px}
+.mini-content{max-width:230px}
+.mini-content .tag{margin-right:7px;vertical-align:middle}
+.mini-content>span:last-child{display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.mini-metric{color:var(--accent);white-space:nowrap;width:82px}
+.mini-empty{text-align:center;color:var(--muted);padding:18px!important}
 .chart-axis-guide{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border:1px solid #d8d4c8;border-left:4px solid var(--accent);background:#faf9f5;padding:8px 10px;margin-bottom:12px;font-size:9px;color:var(--muted)}
 .chart-axis-guide strong{color:var(--text)}
 .metric-control .period-select{min-width:190px}
@@ -249,7 +262,7 @@ details.card-box[open] summary::before{content:'▾ '}
   .posts-grid{grid-template-columns:1fr}.topbar .t-status span{display:none}
   .month-compare-grid{grid-template-columns:repeat(2,1fr)}
   .compare-periods{align-items:stretch}.compare-periods .period-control{flex:1;min-width:140px}.compare-periods .period-select{width:100%}
-  .compare-chart-grid{grid-template-columns:1fr}
+  .compare-chart-grid,.compare-table-grid{grid-template-columns:1fr}
 }
 
 /* ═══════ BRUTALIST SPEC-SHEET THEME ═══════ */

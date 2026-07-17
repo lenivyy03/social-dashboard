@@ -16,7 +16,7 @@ let monthFilter=null;            // null=todos los posts cacheados; 'YYYY-MM' pa
 let compareMonthA=null;           // mes principal de Comparar Posts
 let compareMonthB=null;           // segundo mes opcional de Comparar Posts
 let compareMetric='eng';           // métrica visible en las barras de Comparar Posts
-let compareChartOrder='chronological'; // chronological | table
+let compareChartOrder='chronological'; // chronological | desc | asc
 let growthYear=null;              // año visible en Crecimiento de Seguidores
 
 const COMPARE_CHART_METRICS={

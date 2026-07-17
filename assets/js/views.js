@@ -118,16 +118,17 @@ function viewComparar(data){
   if(compareMonthB&&(!months.includes(compareMonthB)||compareMonthB===compareMonthA)) compareMonthB=null;
   const allFiltered=getFiltered(scoped);
   const metric=COMPARE_CHART_METRICS[compareMetric]||COMPARE_CHART_METRICS.eng;
-  const sortLabels={date:'Fecha',plat:'Red',fmt:'Formato',likes:'Likes',comments:'Comentarios',shares:'Compartidos',eng:'Engagement total',reach:'Alcance',vviews:'Reproducciones'};
-  const chartOrderHelp=compareChartOrder==='table'
-    ? `publicaciones como la tabla · ${sortLabels[sortState.col]||'orden elegido'} · ${sortState.dir==='desc'?'mayor a menor':'menor a mayor'}`
-    : 'fecha de publicación · F=Facebook, I=Instagram';
+  const chartOrderHelp=compareChartOrder==='chronological'
+    ? 'fecha de publicación · F=Facebook, I=Instagram'
+    : `${metric.label} · ${compareChartOrder==='desc'?'mayor a menor':'menor a mayor'}`;
   const selected=new Set([compareMonthA,compareMonthB].filter(Boolean));
   const chartPosts=compareMonthB?allFiltered.filter(p=>selected.has(monthKey(p._dt))):allFiltered;
   let posts=chartPosts;
   const periodPanel=compareMonthB?monthComparisonPanel(chartPosts,compareMonthA,compareMonthB):`<div class="insight compare-all-note"><span class="ico">📚</span>Mostrando juntas <strong>todas las publicaciones de los últimos 4 meses</strong>. Elige un segundo mes para activar la comparación VS.</div>`;
   const nSugg=suggestPairs(data).length;
   if(combineMode) posts=combinePairs(posts);
+  const monthATablePosts=compareMonthB?posts.filter(p=>monthKey(p._dt)===compareMonthA):[];
+  const monthBTablePosts=compareMonthB?posts.filter(p=>monthKey(p._dt)===compareMonthB):[];
   const combineInsight = combineMode ? `<div class="insight" style="margin-bottom:14px"><span class="ico">🔗</span>Mostrando ${LS.pairs.length} pieza(s) vinculada(s) como una sola fila (mismo día = automático, 1+ día = confirmado por ti). Los posts sin pareja quedan individuales.</div>` : '';
   document.getElementById('viewBody').innerHTML=`
     <div class="compare-periods">
@@ -148,10 +149,11 @@ function viewComparar(data){
           ${Object.entries(COMPARE_CHART_METRICS).map(([key,value])=>`<option value="${key}" ${compareMetric===key?'selected':''}>${value.label}</option>`).join('')}
         </select>
       </label>
-      <label class="period-control order-control"><span>Orden de barras</span>
+      <label class="period-control order-control"><span>Orden de barras y tablas</span>
         <select class="period-select" onchange="setCompareChartOrder(this.value)">
           <option value="chronological" ${compareChartOrder==='chronological'?'selected':''}>Por fecha</option>
-          <option value="table" ${compareChartOrder==='table'?'selected':''}>Igual que la tabla</option>
+          <option value="desc" ${compareChartOrder==='desc'?'selected':''}>Mayor a menor · ${metric.label}</option>
+          <option value="asc" ${compareChartOrder==='asc'?'selected':''}>Menor a mayor · ${metric.label}</option>
         </select>
       </label>
     </div>
@@ -175,20 +177,35 @@ function viewComparar(data){
         <div class="compare-chart-panel"><div class="compare-chart-title">${monthLabel(compareMonthB)} <span>${chartPosts.filter(p=>monthKey(p._dt)===compareMonthB).length} posts</span></div><div class="compare-chart-metric">${metric.label}</div><canvas id="cBarsB"></canvas></div>
       </div>`:'<canvas id="cBars"></canvas>'}
     </div>
-    <div class="card-box">
+    ${compareMonthB?`<div class="compare-table-grid">
+      <div class="card-box compare-table-card">
+        <div class="card-hdr"><div class="card-title">Publicaciones · ${monthLabel(compareMonthA)}</div><span class="mini-table-count">${monthATablePosts.length} posts</span></div>
+        <div class="tbl-wrap mini-compare-table" id="tblWrapA"></div>
+      </div>
+      <div class="card-box compare-table-card">
+        <div class="card-hdr"><div class="card-title">Publicaciones · ${monthLabel(compareMonthB)}</div><span class="mini-table-count">${monthBTablePosts.length} posts</span></div>
+        <div class="tbl-wrap mini-compare-table" id="tblWrapB"></div>
+      </div>
+    </div>`:`<div class="card-box">
       <div class="card-hdr"><div class="card-title">Tabla Comparativa — clic en encabezado para ordenar</div></div>
       <div class="tbl-wrap" id="tblWrap"></div>
-    </div>`;
+    </div>`}`;
   if(compareMonthB){
+    const monthAPosts=chartPosts.filter(p=>monthKey(p._dt)===compareMonthA);
+    const monthBPosts=chartPosts.filter(p=>monthKey(p._dt)===compareMonthB);
     const sharedMax=Math.max(...chartPosts.map(p=>p[metric.key]||0),1);
-    drawBars(chartPosts.filter(p=>monthKey(p._dt)===compareMonthA),'cBarsA',metric.key,sharedMax,compareChartOrder);
-    drawBars(chartPosts.filter(p=>monthKey(p._dt)===compareMonthB),'cBarsB',metric.key,sharedMax,compareChartOrder);
-  }else drawBars(chartPosts,'cBars',metric.key,null,compareChartOrder);
-  renderTable(posts);
+    drawBars(monthAPosts,'cBarsA',metric.key,sharedMax,compareChartOrder);
+    drawBars(monthBPosts,'cBarsB',metric.key,sharedMax,compareChartOrder);
+    renderMonthCompareTable(monthATablePosts,'tblWrapA',metric);
+    renderMonthCompareTable(monthBTablePosts,'tblWrapB',metric);
+  }else{
+    drawBars(chartPosts,'cBars',metric.key,null,compareChartOrder);
+    renderTable(posts);
+  }
 }
 function toggleCombine(){ combineMode=!combineMode; renderView(); }
 function setCompareMetric(metric){ if(COMPARE_CHART_METRICS[metric]) compareMetric=metric; renderView(); }
-function setCompareChartOrder(order){ if(order==='chronological'||order==='table') compareChartOrder=order; renderView(); }
+function setCompareChartOrder(order){ if(['chronological','desc','asc'].includes(order)) compareChartOrder=order; renderView(); }
 
 function setCompareMonth(which,value){
   if(which==='a'){
@@ -381,12 +398,33 @@ function renderTable(posts){
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function renderMonthCompareTable(posts,targetId,metric){
+  const sorted=orderComparePosts(posts,metric.key,compareChartOrder);
+  const platform=p=>p._plat==='IG'?'📸':p._plat==='FB'?'📘':'📘📸';
+  const rows=sorted.map(p=>{
+    const fmtTag=`tag-${p._fmt.toLowerCase().replace('á','a')}`;
+    const value=p[metric.key]||0;
+    return `<tr>
+      <td class="mini-date">${fmtDate(p.created_time)}</td>
+      <td class="mini-platform" title="${p._plat}">${platform(p)}${p._paid?' 💰':''}</td>
+      <td class="mini-content"><span class="tag ${fmtTag}">${p._fmt}</span><span title="${esc(p.message||'Sin texto')}">${esc(p.message||'Sin texto')}</span></td>
+      <td class="td-num mini-metric">${fmt(value)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById(targetId).innerHTML=`<table>
+    <thead><tr><th>Fecha</th><th>Red</th><th>Contenido</th><th>${metric.label}</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="mini-empty">Sin publicaciones</td></tr>'}</tbody>
+  </table>`;
+}
+
 function sortBy(col){
   if(sortState.col===col) sortState.dir=sortState.dir==='desc'?'asc':'desc';
   else { sortState.col=col; sortState.dir='desc'; }
   const chartMetric={likes:'likes',comments:'comments',shares:'shares',eng:'eng',reach:'reach',vviews:'views'}[col];
-  if(chartMetric) compareMetric=chartMetric;
-  compareChartOrder='table';
+  if(chartMetric){
+    compareMetric=chartMetric;
+    compareChartOrder=sortState.dir;
+  }
   renderView();
 }
 function sortPosts(posts){
