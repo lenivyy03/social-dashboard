@@ -68,6 +68,26 @@ async function fetchPageFollowerHistory(pageId,t,year=new Date().getFullYear()){
   }
 }
 
+async function fetchInstagramFollowerHistory(igId,t,year=new Date().getFullYear()){
+  const windows=followerHistoryWindows(year);
+  try{
+    const responses=await Promise.all(windows.map(w=>api(`/${igId}/insights?metric=follower_count&period=day&since=${w.since}&until=${w.until}`,t)));
+    const metrics=responses.map(response=>(response.data||[]).find(row=>row.name==='follower_count'));
+    // Instagram conserva un periodo limitado. Si falta una ventana del año,
+    // no presentamos una suma parcial como si fuera el total anual.
+    if(metrics.some(metric=>!metric?.values?.length)) return [];
+    const byDate=new Map();
+    metrics.forEach(metric=>metric.values.forEach(point=>{
+      const date=String(point.end_time||point.date||'').slice(0,10);
+      if(date) byDate.set(date,Number(point.value)||0);
+    }));
+    return [...byDate].map(([date,value])=>({date,value,source:'meta',metric:'follower_count'})).sort((a,b)=>a.date.localeCompare(b.date));
+  }catch(e){
+    console.warn('Instagram no entregó el total anual de seguidores ganados:',e.message);
+    return [];
+  }
+}
+
 function prepareLoadedPosts(posts){
   posts.forEach(p=>{
     if(p._plat==='FB'){
@@ -91,14 +111,16 @@ async function loadPageData(pageId,onProgress){
       cache[pageId]=saved; recordSnapshot(pageId,saved.fans,saved.posts); onProgress?.('cache');
       // Si ya cubre toda la ventana, dos horas de caché bastan. Si aún había
       // paginación, se muestra al instante y se actualiza en segundo plano.
-      if(saved.completeWindow&&saved.followerHistory?.fb?.length) return;
+      if(saved.completeWindow&&saved.followerHistory?.loaded) return;
     }
   }catch(e){ console.warn('Caché local no disponible:',e.message); }
   const t=window._pt[pageId]||TOKEN;
   const page=pages.find(p=>p.id===pageId);
   const igId=page?.instagram_business_account?.id||null;
   const debug={fb:[],fbVideo:[],igPhoto:[],igVideo:[]}; // qué métricas respondieron OK, para diagnóstico
-  const followerHistoryTask=fetchPageFollowerHistory(pageId,t,new Date().getFullYear());
+  const followerYear=new Date().getFullYear();
+  const followerHistoryTask=fetchPageFollowerHistory(pageId,t,followerYear);
+  const igFollowerHistoryTask=igId?fetchInstagramFollowerHistory(igId,t,followerYear):Promise.resolve([]);
 
   const facebookBase=Promise.all([
     api(`/${pageId}/posts?fields=id,message,created_time,full_picture,status_type,attachments{media_type,type},likes.summary(true),comments.summary(true),shares&limit=50`,t),
@@ -118,14 +140,16 @@ async function loadPageData(pageId,onProgress){
   const igPosts=filterRecentPosts(igRaw);
   const posts=prepareLoadedPosts(filterRecentPosts([...fbPosts,...igPosts]));
   const fans=pi.fan_count||pi.followers_count||0,igFans=ii.followers_count||0;
-  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,followerHistory:{fb:[]},paging:{fb:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null,ig:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null},loadedMonths:4,loadingMore:false,metricsLoading:true,fromCache:false};
+  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,followerHistory:{fb:[],ig:[],year:followerYear,loaded:false},paging:{fb:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null,ig:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null},loadedMonths:4,loadingMore:false,metricsLoading:true,fromCache:false};
   onProgress?.('base');
 
   // Las métricas de ambas redes se completan en paralelo mientras la interfaz ya es visible.
-  const [fbDebug,igDebug,fbFollowerHistory]=await Promise.all([enrichFBPosts(fbPosts,t,pageId),enrichIGPosts(igPosts,t,pageId),followerHistoryTask]);
+  const [fbDebug,igDebug,fbFollowerHistory,igFollowerHistory]=await Promise.all([enrichFBPosts(fbPosts,t,pageId),enrichIGPosts(igPosts,t,pageId),followerHistoryTask,igFollowerHistoryTask]);
   debug.fb=fbDebug.fb; debug.fbVideo=fbDebug.fbVideo;
   debug.igPhoto=igDebug.igPhoto; debug.igVideo=igDebug.igVideo;
   cache[pageId].followerHistory.fb=fbFollowerHistory;
+  cache[pageId].followerHistory.ig=igFollowerHistory;
+  cache[pageId].followerHistory.loaded=true;
   prepareLoadedPosts(posts);
   cache[pageId].metricsLoading=false;
   onProgress?.('followers');

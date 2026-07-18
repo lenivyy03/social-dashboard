@@ -6,12 +6,21 @@ function viewResumen(data){
   const avgEngOrg=avg(org.map(p=>p._eng));
   const avgReach=avg(posts.map(p=>p._reach));
   const er=avgReach>0?((avgEng/avgReach)*100).toFixed(1)+'%':'—';
+  const followerYear=data.followerHistory?.year||new Date().getFullYear();
+  const annualFollowerTotal=platform=>{
+    const rows=data.followerHistory?.[platform]||[];
+    return rows.length?rows.reduce((total,row)=>total+(Number(row.value)||0),0):null;
+  };
+  const fbGained=annualFollowerTotal('fb'),igGained=annualFollowerTotal('ig');
+  const gainedCard=(icon,label,value,color)=>`<div class="sc follower-gained-card"><div class="sc-lbl">${icon} ${label}</div><div class="sc-val" style="color:${color}">${value===null?'No disponible':`+${fmt(value)}`}</div><div class="sc-sub">Seguidores ganados en ${followerYear}</div></div>`;
   document.getElementById('viewBody').innerHTML=`
-    <div class="stats-grid">
+    <div class="stats-grid summary-stats">
       <div class="sc"><div class="sc-lbl">Seguidores</div><div class="sc-val bl">${fmt(fans)}</div>${cache[currentPage.id].hasIG?`<div class="sc-sub" style="color:var(--muted)">📸 IG: ${fmt(cache[currentPage.id].igFans)}</div>`:''}</div>
       <div class="sc"><div class="sc-lbl">Eng. Promedio</div><div class="sc-val gr">${fmt(Math.round(avgEng))}</div><div class="sc-sub" style="color:var(--muted)">Orgánico: ${fmt(Math.round(avgEngOrg))}</div></div>
       <div class="sc"><div class="sc-lbl">Eng. Rate</div><div class="sc-val ye">${er}</div></div>
       <div class="sc"><div class="sc-lbl">Posts pagados</div><div class="sc-val or">${posts.filter(p=>p._paid).length}/${posts.length}</div></div>
+      ${gainedCard('📘','Facebook',fbGained,'var(--fb)')}
+      ${gainedCard('📸','Instagram',igGained,'var(--ig)')}
     </div>
     ${metricsDebugPanel(cache[currentPage.id])}
     <div class="card-box">

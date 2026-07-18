@@ -59,6 +59,9 @@ body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--tex
 
 /* STATS */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:20px}
+.summary-stats{grid-template-columns:repeat(3,1fr)}
+.follower-gained-card .sc-val{font-size:22px}
+.follower-gained-card .sc-sub{margin-top:4px;color:var(--muted);font-size:8px;text-transform:uppercase}
 .sc{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;min-width:0}
 .sc-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sc-val{font-family:'Space Grotesk';font-size:22px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
