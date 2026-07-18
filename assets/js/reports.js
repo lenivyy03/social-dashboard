@@ -3,8 +3,11 @@ function genReport(pageId){
   const data=cache[pageId]; if(!data?.posts?.length) return;
   const {posts,fans}=data; const page=pages.find(p=>p.id===pageId);
   const org=posts.filter(p=>!p._paid), paid=posts.filter(p=>p._paid);
-  const erOrg=avg(org.map(p=>{const b=p._reach>0?p._reach:fans;return b>0?p._eng/b*100:0;})).toFixed(2);
-  const top=[...org].sort((a,b)=>b._eng-a._eng).slice(0,3);
+  const evaluated=org.map(post=>({post,...calculatePostER(post,LS.snaps[pageId]||[])}));
+  const excluded=evaluated.filter(row=>!row.rankable);
+  const ranked=scoreERPercentiles(evaluated.filter(row=>row.rankable)).sort((a,b)=>b.score-a.score||b.er-a.er);
+  const erOrg=ranked.length?avg(ranked.map(row=>row.er)).toFixed(2):'N/D';
+  const top=ranked.slice(0,3);
   const fmts={}; posts.forEach(p=>{if(!fmts[p._fmt])fmts[p._fmt]={n:0,eng:0};fmts[p._fmt].n++;fmts[p._fmt].eng+=p._eng;});
   const fmtLines=Object.entries(fmts).map(([k,v])=>`  ${k}: ${v.n} posts, ${Math.round(v.eng/v.n)} eng promedio`).join('\n');
   const dayEng=[0,0,0,0,0,0,0],dayCnt=[0,0,0,0,0,0,0];
@@ -15,11 +18,13 @@ Página: ${page?.name||pageId}
 Fecha: ${fmtDate(new Date())}
 Seguidores: ${fmt(fans)}
 Posts totales: ${posts.length} — FB: ${posts.filter(p=>p._plat==='FB').length}, IG: ${posts.filter(p=>p._plat==='IG').length} (${org.length} orgánicos, ${paid.length} pagados marcados)
-Engagement Rate ORGÁNICO: ${erOrg}%
+Engagement Rate ORGÁNICO comparable: ${erOrg}${erOrg==='N/D'?'':'%'}
+Metodología ER: alcance real; si falta, snapshot de seguidores de la fecha (estimado); si ambos faltan, se excluye.
+Posts excluidos por falta de datos: ${excluded.length}
 
 --- TOP 3 ORGÁNICOS ---
-${top.map((p,i)=>`${i+1}. [${p._plat}/${p._fmt}] "${(p.message||'Sin texto').slice(0,70)}..."
-   ${fmtDate(p.created_time)} | likes ${p._likes} coment ${p._comments} shares ${p._shares} | Alcance: ${p._reach>0?fmt(p._reach):'N/D'}`).join('\n\n')}
+${top.length?top.map((row,i)=>{const p=row.post;return `${i+1}. [${p._plat}/${p._fmt}] "${(p.message||'Sin texto').slice(0,70)}..."
+   ${fmtDate(p.created_time)} | ER ${row.er.toFixed(2)}% (${row.label}) | percentil ${row.score.toFixed(1)}/10${row.sampleSmall?' · muestra chica':''} | likes ${p._likes} coment ${p._comments} shares ${p._shares} | Alcance: ${p._reach>0?fmt(p._reach):'N/D'}`;}).join('\n\n'):'Sin publicaciones con datos suficientes.'}
 
 --- RENDIMIENTO POR FORMATO ---
 ${fmtLines}

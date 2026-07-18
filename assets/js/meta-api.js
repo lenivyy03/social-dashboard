@@ -34,6 +34,60 @@ async function fetchPeriodPages(path,t){
   return items;
 }
 
+function followerHistoryWindows(year,now=new Date()){
+  const y=Number(year),todayYear=now.getFullYear();
+  const start=new Date(Date.UTC(y,0,1));
+  const endExclusive=y===todayYear
+    ? new Date(Date.UTC(y,now.getMonth(),now.getDate()+1))
+    : new Date(Date.UTC(y+1,0,1));
+  const windows=[];
+  for(let cursor=new Date(start);cursor<endExclusive;){
+    const until=new Date(Math.min(cursor.getTime()+89*86400000,endExclusive.getTime()));
+    windows.push({since:Math.floor(cursor.getTime()/1000),until:Math.floor(until.getTime()/1000)});
+    cursor=until;
+  }
+  return windows;
+}
+
+async function fetchPageFollowerHistory(pageId,t,year=new Date().getFullYear()){
+  const windows=followerHistoryWindows(year);
+  try{
+    const responses=await Promise.all(windows.map(w=>api(`/${pageId}/insights?metric=page_daily_follows&period=day&since=${w.since}&until=${w.until}`,t)));
+    const byDate=new Map();
+    responses.forEach(response=>{
+      const metric=(response.data||[]).find(row=>row.name==='page_daily_follows')||(response.data||[])[0];
+      (metric?.values||[]).forEach(point=>{
+        const date=String(point.end_time||point.date||'').slice(0,10);
+        if(date) byDate.set(date,Number(point.value)||0);
+      });
+    });
+    return [...byDate].map(([date,value])=>({date,value,source:'meta',metric:'page_daily_follows'})).sort((a,b)=>a.date.localeCompare(b.date));
+  }catch(e){
+    console.warn('Meta no entregó el histórico anual de seguidores de Facebook:',e.message);
+    return [];
+  }
+}
+
+async function fetchInstagramFollowerHistory(igId,t,year=new Date().getFullYear(),now=new Date()){
+  const windowDays=30;
+  const until=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1));
+  const since=new Date(until.getTime()-windowDays*86400000);
+  try{
+    const response=await api(`/${igId}/insights?metric=follower_count&period=day&since=${Math.floor(since.getTime()/1000)}&until=${Math.floor(until.getTime()/1000)}`,t);
+    const metric=(response.data||[]).find(row=>row.name==='follower_count');
+    const byDate=new Map();
+    (metric?.values||[]).forEach(point=>{
+      const date=String(point.end_time||point.date||'').slice(0,10);
+      if(date) byDate.set(date,Number(point.value)||0);
+    });
+    const rows=[...byDate].map(([date,value])=>({date,value,source:'meta',metric:'follower_count'})).sort((a,b)=>a.date.localeCompare(b.date));
+    return {rows,windowDays,year:Number(year)};
+  }catch(e){
+    console.warn('Instagram no entregó seguidores nuevos de los últimos 30 días:',e.message);
+    return {rows:[],windowDays,year:Number(year)};
+  }
+}
+
 function prepareLoadedPosts(posts){
   posts.forEach(p=>{
     if(p._plat==='FB'){
@@ -54,16 +108,19 @@ async function loadPageData(pageId,onProgress){
   try{
     const saved=await getPageDataCache(pageId);
     if(saved){
-      cache[pageId]=saved; recordSnapshot(pageId,saved.fans,saved.posts); onProgress?.('cache');
+      cache[pageId]=saved; recordSnapshot(pageId,saved.fans,saved.hasIG&&saved.igFans>0?saved.igFans:undefined,saved.posts); onProgress?.('cache');
       // Si ya cubre toda la ventana, dos horas de caché bastan. Si aún había
       // paginación, se muestra al instante y se actualiza en segundo plano.
-      if(saved.completeWindow) return;
+      if(saved.completeWindow&&saved.followerHistory?.loaded) return;
     }
   }catch(e){ console.warn('Caché local no disponible:',e.message); }
   const t=window._pt[pageId]||TOKEN;
   const page=pages.find(p=>p.id===pageId);
   const igId=page?.instagram_business_account?.id||null;
   const debug={fb:[],fbVideo:[],igPhoto:[],igVideo:[]}; // qué métricas respondieron OK, para diagnóstico
+  const followerYear=new Date().getFullYear();
+  const followerHistoryTask=fetchPageFollowerHistory(pageId,t,followerYear);
+  const igFollowerHistoryTask=igId?fetchInstagramFollowerHistory(igId,t,followerYear):Promise.resolve({rows:[],windowDays:30,year:followerYear});
 
   const facebookBase=Promise.all([
     api(`/${pageId}/posts?fields=id,message,created_time,full_picture,status_type,attachments{media_type,type},likes.summary(true),comments.summary(true),shares&limit=50`,t),
@@ -83,21 +140,25 @@ async function loadPageData(pageId,onProgress){
   const igPosts=filterRecentPosts(igRaw);
   const posts=prepareLoadedPosts(filterRecentPosts([...fbPosts,...igPosts]));
   const fans=pi.fan_count||pi.followers_count||0,igFans=ii.followers_count||0;
-  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,paging:{fb:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null,ig:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null},loadedMonths:4,loadingMore:false,metricsLoading:true,fromCache:false};
+  cache[pageId]={posts,fans,igFans,hasIG:!!igId,debug,followerHistory:{fb:[],ig:{rows:[],windowDays:30,year:followerYear},year:followerYear,loaded:false},paging:{fb:shouldContinueRecentPaging(fbRaw)?(pr.paging?.next||null):null,ig:shouldContinueRecentPaging(igRaw)?(mr.paging?.next||null):null},loadedMonths:4,loadingMore:false,metricsLoading:true,fromCache:false};
   onProgress?.('base');
 
   // Las métricas de ambas redes se completan en paralelo mientras la interfaz ya es visible.
-  const [fbDebug,igDebug]=await Promise.all([enrichFBPosts(fbPosts,t,pageId),enrichIGPosts(igPosts,t,pageId)]);
+  const [fbDebug,igDebug,fbFollowerHistory,igFollowerHistory]=await Promise.all([enrichFBPosts(fbPosts,t,pageId),enrichIGPosts(igPosts,t,pageId),followerHistoryTask,igFollowerHistoryTask]);
   debug.fb=fbDebug.fb; debug.fbVideo=fbDebug.fbVideo;
   debug.igPhoto=igDebug.igPhoto; debug.igVideo=igDebug.igVideo;
+  cache[pageId].followerHistory.fb=fbFollowerHistory;
+  cache[pageId].followerHistory.ig=igFollowerHistory;
+  cache[pageId].followerHistory.loaded=true;
   prepareLoadedPosts(posts);
   cache[pageId].metricsLoading=false;
+  onProgress?.('followers');
 
   // Piezas del MISMO día se vinculan automático (en la práctica casi nunca falla).
   // Diferencias de 1+ día siguen pidiendo confirmación manual en "Vincular piezas".
   autoLinkSameDay(fbPosts,igPosts);
 
-  recordSnapshot(pageId,fans,posts);
+  recordSnapshot(pageId,fans,igId&&ii.followers_count!==undefined?igFans:undefined,posts);
   savePageDataCache(pageId,cache[pageId]).catch(e=>console.warn('No se guardó la caché:',e.message));
 }
 
@@ -233,7 +294,7 @@ async function loadMorePosts(pageId){
     data.posts=prepareLoadedPosts([...byId.values()]);
     data.loadedMonths=loadedMonthCount(data)+1;
     autoLinkSameDay(data.posts.filter(p=>p._plat==='FB'),data.posts.filter(p=>p._plat==='IG'));
-    recordSnapshot(pageId,data.fans,data.posts);
+    recordSnapshot(pageId,data.fans,data.hasIG&&data.igFans>0?data.igFans:undefined,data.posts);
     savePageDataCache(pageId,data).catch(e=>console.warn('No se guardó la caché:',e.message));
   }catch(e){ alert('No se pudo cargar el mes anterior: '+e.message); }
   data.loadingMore=false;

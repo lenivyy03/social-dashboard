@@ -1,12 +1,19 @@
 // Históricos ligeros de página permanecen en localStorage para las gráficas existentes.
-function recordSnapshot(pageId,fans,posts){
+function recordSnapshot(pageId,fans,igFans,posts){
+  // Compatibilidad con llamadas antiguas recordSnapshot(pageId,fans,posts).
+  if(Array.isArray(igFans)&&posts===undefined){posts=igFans;igFans=undefined;}
+  posts=posts||[];
   const today=new Date().toISOString().slice(0,10);
   if(!LS.snaps[pageId]) LS.snaps[pageId]=[];
   const arr=LS.snaps[pageId];
   const avgEng=posts.length?Math.round(posts.reduce((s,p)=>s+p._eng,0)/posts.length):0;
   const existing=arr.find(s=>s.date===today);
-  if(existing){ existing.fans=fans; existing.avgEng=avgEng; }
-  else arr.push({date:today,fans,avgEng});
+  if(existing){ existing.fans=fans; existing.avgEng=avgEng; if(igFans!==undefined) existing.igFans=Number(igFans)||0; }
+  else {
+    const snapshot={date:today,fans,avgEng};
+    if(igFans!==undefined) snapshot.igFans=Number(igFans)||0;
+    arr.push(snapshot);
+  }
   // Conserva algo más de un año para poder consultar la tendencia anual completa.
   if(arr.length>400) LS.snaps[pageId]=arr.slice(-400);
   LS.save();
@@ -46,7 +53,7 @@ async function savePageDataCache(pageId,data){
   const tx=db.transaction(PAGE_CACHE_STORE,'readwrite');
   tx.objectStore(PAGE_CACHE_STORE).put({
     pageId:String(pageId),savedAt:Date.now(),
-    data:{posts:data.posts,fans:data.fans||0,igFans:data.igFans||0,hasIG:!!data.hasIG,debug:data.debug||{fb:[],fbVideo:[],igPhoto:[],igVideo:[]},completeWindow:!data.paging?.fb&&!data.paging?.ig}
+    data:{posts:data.posts,fans:data.fans||0,igFans:data.igFans||0,hasIG:!!data.hasIG,debug:data.debug||{fb:[],fbVideo:[],igPhoto:[],igVideo:[]},followerHistory:data.followerHistory||{fb:[],ig:[],year:new Date().getFullYear(),loaded:false},completeWindow:!data.paging?.fb&&!data.paging?.ig}
   });
   await transactionDone(tx); db.close();
 }

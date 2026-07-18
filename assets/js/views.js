@@ -6,12 +6,22 @@ function viewResumen(data){
   const avgEngOrg=avg(org.map(p=>p._eng));
   const avgReach=avg(posts.map(p=>p._reach));
   const er=avgReach>0?((avgEng/avgReach)*100).toFixed(1)+'%':'—';
+  const followerYear=data.followerHistory?.year||new Date().getFullYear();
+  const fbRows=data.followerHistory?.fb||[],igWindow=instagramFollowerWindow(data),igRows=igWindow.rows;
+  const fbGained=fbRows.length?fbRows.reduce((total,row)=>total+(Number(row.value)||0),0):null;
+  const igGained=igRows.length?igRows.reduce((total,row)=>total+(Number(row.value)||0),0):null;
+  const annualIgSnapshots=data.hasIG?(LS.snaps[currentPage.id]||[]).filter(s=>String(s.date).startsWith(`${followerYear}-`)&&Number.isFinite(Number(s.igFans))).sort((a,b)=>a.date.localeCompare(b.date)):[];
+  const igLocal=annualIgSnapshots.length>=2?{delta:Number(annualIgSnapshots.at(-1).igFans)-Number(annualIgSnapshots[0].igFans),since:annualIgSnapshots[0].date}:null;
+  const fbCard=`<div class="sc follower-gained-card"><div class="sc-lbl">📘 Facebook · Seguidores ganados</div><div class="sc-val" style="color:var(--fb)">${fbGained===null?'No disponible':`+${fmt(fbGained)}`}</div><div class="sc-sub">Año ${followerYear} · Fuente: Meta</div></div>`;
+  const igCard=`<div class="sc follower-gained-card"><div class="sc-lbl">📸 Instagram · Seguidores ganados</div><div class="sc-val" style="color:var(--ig)">${igGained===null?'No disponible':`+${fmt(igGained)}`}</div><div class="sc-sub">Últimos ${igWindow.windowDays} días (límite de la API de Meta)</div>${igLocal?`<div class="sc-sub ig-local-delta">${igLocal.delta>=0?'+':''}${fmt(igLocal.delta)} desde ${fmtDate(igLocal.since)}, acumulado local</div>`:''}</div>`;
   document.getElementById('viewBody').innerHTML=`
-    <div class="stats-grid">
+    <div class="stats-grid summary-stats">
       <div class="sc"><div class="sc-lbl">Seguidores</div><div class="sc-val bl">${fmt(fans)}</div>${cache[currentPage.id].hasIG?`<div class="sc-sub" style="color:var(--muted)">📸 IG: ${fmt(cache[currentPage.id].igFans)}</div>`:''}</div>
       <div class="sc"><div class="sc-lbl">Eng. Promedio</div><div class="sc-val gr">${fmt(Math.round(avgEng))}</div><div class="sc-sub" style="color:var(--muted)">Orgánico: ${fmt(Math.round(avgEngOrg))}</div></div>
       <div class="sc"><div class="sc-lbl">Eng. Rate</div><div class="sc-val ye">${er}</div></div>
       <div class="sc"><div class="sc-lbl">Posts pagados</div><div class="sc-val or">${posts.filter(p=>p._paid).length}/${posts.length}</div></div>
+      ${fbCard}
+      ${igCard}
     </div>
     ${metricsDebugPanel(cache[currentPage.id])}
     <div class="card-box">
@@ -75,7 +85,10 @@ function platTotalsTable(data){
 }
 
 function growthYearControl(pageId){
-  const years=[...new Set((LS.snaps[pageId]||[]).map(s=>s.date.slice(0,4)))].sort().reverse();
+  const snapshotYears=(LS.snaps[pageId]||[]).map(s=>s.date.slice(0,4));
+  const metaYears=(cache[pageId]?.followerHistory?.fb||[]).map(s=>s.date.slice(0,4));
+  const igYears=instagramFollowerWindow(cache[pageId]).rows.map(s=>s.date.slice(0,4));
+  const years=[...new Set([...snapshotYears,...metaYears,...igYears])].sort().reverse();
   if(!years.length) years.push(String(new Date().getFullYear()));
   if(!growthYear||!years.includes(String(growthYear))) growthYear=years[0];
   return `<label class="period-control compact"><span>Año</span>
@@ -87,25 +100,62 @@ function growthYearControl(pageId){
 
 function setGrowthYear(year){ growthYear=String(year); drawGrowth(currentPage.id); }
 
+function buildAnnualFollowerSeries(rows,year,now=new Date()){
+  const y=Number(year),currentYear=now.getFullYear();
+  const end=y===currentYear?new Date(Date.UTC(y,now.getMonth(),now.getDate())):new Date(Date.UTC(y,11,31));
+  const byDate=new Map(rows.filter(r=>String(r.date).startsWith(`${y}-`)).map(r=>[r.date,Number(r.value)||0]));
+  const series=[];
+  for(let day=new Date(Date.UTC(y,0,1));day<=end;day=new Date(day.getTime()+86400000)){
+    const date=day.toISOString().slice(0,10);
+    series.push({date,value:byDate.get(date)||0});
+  }
+  return series;
+}
+
+function instagramFollowerWindow(data){
+  const raw=data?.followerHistory?.ig;
+  if(Array.isArray(raw)) return {rows:raw,windowDays:30,year:data?.followerHistory?.year||new Date().getFullYear()};
+  return {rows:Array.isArray(raw?.rows)?raw.rows:[],windowDays:Number(raw?.windowDays)||30,year:raw?.year||data?.followerHistory?.year||new Date().getFullYear()};
+}
+
+function cumulativeFollowerPoints(rows,year){
+  let total=0;
+  return rows.filter(row=>String(row.date).startsWith(`${year}-`)).sort((a,b)=>a.date.localeCompare(b.date)).map(row=>({date:row.date,value:(total+=Number(row.value)||0)}));
+}
+
+function snapshotDeltaPoints(snaps,key,year){
+  const rows=snaps.filter(s=>String(s.date).startsWith(`${year}-`)&&Number.isFinite(Number(s[key]))).sort((a,b)=>a.date.localeCompare(b.date));
+  if(rows.length<2) return [];
+  const base=Number(rows[0][key]);
+  return rows.map(row=>({date:row.date,value:Number(row[key])-base}));
+}
+
 function drawGrowth(pageId){
   const allSnaps=LS.snaps[pageId]||[];
+  const metaHistory=cache[pageId]?.followerHistory?.fb||[],igWindow=instagramFollowerWindow(cache[pageId]);
   const area=document.getElementById('growthArea');
   if(!area) return;
-  const years=[...new Set(allSnaps.map(s=>s.date.slice(0,4)))].sort().reverse();
+  const years=[...new Set([...allSnaps.map(s=>s.date.slice(0,4)),...metaHistory.map(s=>s.date.slice(0,4)),...igWindow.rows.map(s=>s.date.slice(0,4))])].sort().reverse();
   if(!growthYear||!years.includes(String(growthYear))) growthYear=years[0]||String(new Date().getFullYear());
-  const snaps=allSnaps.filter(s=>s.date.startsWith(String(growthYear)+'-')).sort((a,b)=>a.date.localeCompare(b.date));
-  if(snaps.length<2){
-    area.innerHTML=`<div style="padding:30px 10px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6">
-      📅 Aún no hay histórico suficiente en ${growthYear}.<br>El dashboard guarda los números cada día que lo abres.<br>
-      <strong style="color:var(--text)">Snapshot de hoy guardado.</strong><br>Vuelve mañana para ver la primera línea de tendencia.</div>`;
+  const fbMeta=cumulativeFollowerPoints(metaHistory,growthYear),fbLocal=snapshotDeltaPoints(allSnaps,'fans',growthYear);
+  const igLocal=cache[pageId]?.hasIG?snapshotDeltaPoints(allSnaps,'igFans',growthYear):[],igMeta=cumulativeFollowerPoints(igWindow.rows,growthYear);
+  const fbPoints=fbMeta.length?fbMeta:fbLocal;
+  const igPoints=igLocal.length?igLocal:igMeta;
+  const series=[];
+  if(fbPoints.length) series.push({label:'Facebook',color:'#1877F2',points:fbPoints});
+  if(igPoints.length) series.push({label:'Instagram',color:'#E1306C',points:igPoints});
+  if(!series.length){
+    area.innerHTML=`<div class="growth-empty">📅 Todavía no hay suficientes datos para ${growthYear}. El dashboard guardará Facebook e Instagram cada día que lo abras para construir la tendencia local.</div>`;
     return;
   }
-  const change=(snaps[snaps.length-1].fans||0)-(snaps[0].fans||0);
-  area.innerHTML=`<div class="growth-summary"><span>${fmt(snaps[0].fans)} iniciales</span><strong class="${change>=0?'positive':'negative'}">${change>=0?'+':''}${fmt(change)} en ${growthYear}</strong><span>${fmt(snaps[snaps.length-1].fans)} actuales</span></div><canvas id="cGrowth"></canvas>`;
+  const sourceParts=[];
+  if(fbPoints.length) sourceParts.push(`Facebook: ${fbMeta.length?'Meta':'acumulado local'}`);
+  if(igPoints.length) sourceParts.push(`Instagram: ${igLocal.length?'acumulado local':`Meta · últimos ${igWindow.windowDays} días`}`);
+  const igMissing=!igPoints.length&&cache[pageId]?.hasIG?`<div class="growth-missing-ig">Instagram aún no tiene serie: se irá acumulando cada día que abras el dashboard.</div>`:'';
+  area.innerHTML=`<div class="growth-legend">${series.map(item=>`<span><i style="background:${item.color}"></i>${item.label}</span>`).join('')}</div><div class="growth-source">Crecimiento acumulado dentro del periodo · ${sourceParts.join(' · ')}</div>${igMissing}<canvas id="cGrowth"></canvas>`;
   const c=document.getElementById('cGrowth');
   const W=c.parentElement.clientWidth,H=180; setupCanvas(c,W,H);
-  const ctx=c.getContext('2d');
-  lineChart(ctx,W,H,snaps.map(s=>s.fans),snaps.map(s=>{const p=s.date.split('-');return `${p[2]}/${p[1]}`;}),'#111111',true);
+  multiLineChart(c.getContext('2d'),W,H,series);
 }
 
 // ════════ VIEW: COMPARAR ════════
@@ -119,7 +169,7 @@ function viewComparar(data){
   const allFiltered=getFiltered(scoped);
   const metric=COMPARE_CHART_METRICS[compareMetric]||COMPARE_CHART_METRICS.eng;
   const chartOrderHelp=compareChartOrder==='chronological'
-    ? 'fecha de publicación · F=Facebook, I=Instagram'
+    ? 'fecha de publicación · el color identifica la red'
     : `${metric.label} · ${compareChartOrder==='desc'?'mayor a menor':'menor a mayor'}`;
   const selected=new Set([compareMonthA,compareMonthB].filter(Boolean));
   const chartPosts=compareMonthB?allFiltered.filter(p=>selected.has(monthKey(p._dt))):allFiltered;
@@ -517,49 +567,43 @@ function viewFormatos(data){
 
 // ════════ VIEW: ANÁLISIS ════════
 function viewAnalisis(data){
-  const fans=data.fans, posts=P(data);
-  const org=posts.filter(p=>!p._paid);
-  posts.forEach(p=>{ const base=p._reach>0?p._reach:fans; p._er=base>0?(p._eng/base*100):0; p._score=Math.min(10,parseFloat((p._er*2).toFixed(1))); });
-  const src=org.length?org:posts;
-  const ranked=[...src].sort((a,b)=>b._er-a._er);
-  const top3=ranked.slice(0,3), bot3=ranked.slice(-3).reverse();
+  const posts=P(data),org=posts.filter(post=>!post._paid),snapshots=LS.snaps[currentPage.id]||[];
+  const evaluated=org.map(post=>({post,...calculatePostER(post,snapshots)}));
+  const excluded=evaluated.filter(row=>!row.rankable);
+  const ranked=scoreERPercentiles(evaluated.filter(row=>row.rankable)).sort((a,b)=>b.score-a.score||b.er-a.er||b.post._dt-a.post._dt);
+  const top3=ranked.slice(0,3),topIds=new Set(top3.map(row=>row.post.id));
+  const bot3=ranked.length>=6?[...ranked].reverse().filter(row=>!topIds.has(row.post.id)).slice(0,3):[];
 
   const dayEng=[0,0,0,0,0,0,0],dayCnt=[0,0,0,0,0,0,0];
-  src.forEach(p=>{ const d=p._dt.getDay(); dayEng[d]+=p._eng; dayCnt[d]++; });
-  const dayAvg=dayEng.map((v,i)=>dayCnt[i]?Math.round(v/dayCnt[i]):0);
+  org.forEach(post=>{const day=post._dt.getDay();dayEng[day]+=post._eng;dayCnt[day]++;});
+  const dayAvg=dayEng.map((value,index)=>dayCnt[index]?Math.round(value/dayCnt[index]):0);
   const bestDay=dayAvg.indexOf(Math.max(...dayAvg));
-
-  const sortedOrg=[...src].sort((a,b)=>b._dt-a._dt);
-  const last5=avg(sortedOrg.slice(0,5).map(p=>p._eng)), prev5=avg(sortedOrg.slice(5,10).map(p=>p._eng));
-  const trend=prev5>0?Math.round((last5-prev5)/prev5*100):0;
-
-  const rankHtml=(list,color)=>list.map(p=>{
-    const img=p.full_picture||'';
-    return `<div class="rank-post">
-      ${img?`<img class="rank-thumb" src="${img}" onerror="this.parentElement.innerHTML='📝'"/>`:'<div class="rank-thumb">📝</div>'}
-      <div class="rank-info"><div class="rank-text">${esc(p.message?.slice(0,45)||'Sin texto')}</div>
-      <div class="rank-meta">${fmtDate(p.created_time)} · ${p._fmt} · Eng: ${p._eng}${p._paid?' · 💰':''}</div></div>
-      <div class="rank-score" style="color:${color}">${p._score}/10</div></div>`;
-  }).join('');
+  const trendFor=platform=>{
+    const rows=org.filter(post=>post._plat===platform).sort((a,b)=>b._dt-a._dt);
+    if(rows.length<10) return null;
+    const latest=avg(rows.slice(0,5).map(post=>post._eng)),previous=avg(rows.slice(5,10).map(post=>post._eng));
+    return previous>0?Math.round((latest-previous)/previous*100):0;
+  };
+  const trendHtml=(label,value,color)=>`<div class="network-trend"><span style="color:${color}">${label}</span><strong class="${value===null?'':value>=0?'positive':'negative'}">${value===null?'Datos insuficientes':`${value>=0?'▲ +':'▼ '}${value}%`}</strong><small>${value===null?'Se necesitan 10 posts orgánicos':'Últimos 5 vs 5 anteriores'}</small></div>`;
+  const rankHtml=(list,color)=>list.map(row=>{const post=row.post,img=post.full_picture||'';return `<div class="rank-post">
+    ${img?`<img class="rank-thumb" src="${img}" onerror="this.parentElement.innerHTML='📝'"/>`:'<div class="rank-thumb">📝</div>'}
+    <div class="rank-info"><div class="rank-text">${esc(post.message?.slice(0,45)||'Sin texto')}</div><div class="rank-meta">${post._plat} · ${fmtDate(post.created_time)} · ${post._fmt} · ER ${row.er.toFixed(2)}% (${row.label})</div></div>
+    <div class="rank-score" style="color:${color}">${row.score.toFixed(1)}/10${row.sampleSmall?'<small>muestra chica</small>':''}</div></div>`;}).join('');
+  const bottomPanel=ranked.length>=6
+    ? `<div class="card-box"><div class="card-hdr"><div class="card-title">📉 Necesitan mejora</div></div><div class="rank-posts">${rankHtml(bot3,'var(--red)')}</div></div>`
+    : `<div class="card-box"><div class="card-hdr"><div class="card-title">📉 Necesitan mejora</div></div><div class="analysis-note">Se necesitan al menos 6 publicaciones orgánicas con ER calculable para separar un grupo inferior sin repetir el Top.</div></div>`;
+  const excludedHtml=excluded.map(row=>`<li><strong>${row.post._plat} · ${fmtDate(row.post.created_time)}</strong> — ${esc(firstCaptionLine(row.post.message).slice(0,90))}</li>`).join('');
 
   document.getElementById('viewBody').innerHTML=`
-    <div class="card-hdr" style="margin-bottom:14px">
-      <div class="card-title">Análisis de Rendimiento (orgánico)</div>
-      <button class="btn-report" onclick="genReport('${currentPage.id}')">📋 Generar Reporte para Codex</button>
-    </div>
-    <div class="chart-2col">
-      <div class="card-box"><div class="card-hdr"><div class="card-title">🏆 Top 3 (orgánico)</div></div><div class="rank-posts">${rankHtml(top3,'var(--green)')||'Sin datos'}</div></div>
-      <div class="card-box"><div class="card-hdr"><div class="card-title">📉 Necesitan mejora</div></div><div class="rank-posts">${rankHtml(bot3,'var(--red)')||'Sin datos'}</div></div>
-    </div>
-    <div class="card-box">
-      <div class="card-hdr"><div class="card-title">Resumen</div></div>
-      <div class="stats-grid">
-        <div class="sc"><div class="sc-lbl">ER Orgánico</div><div class="sc-val ye">${avg(org.map(p=>p._er)).toFixed(2)}%</div></div>
-        <div class="sc"><div class="sc-lbl">Tendencia (5 vs 5)</div><div class="sc-val ${trend>=0?'gr':'or'}">${trend>=0?'▲ +':'▼ '}${trend}%</div></div>
-        <div class="sc"><div class="sc-lbl">Mejor día</div><div class="sc-val bl">${DAYS[bestDay]}</div></div>
-        <div class="sc"><div class="sc-lbl">Posts orgánicos</div><div class="sc-val pu">${org.length}/${posts.length}</div></div>
-      </div>
-    </div>`;
+    <div class="card-hdr" style="margin-bottom:14px"><div class="card-title">Análisis de Rendimiento (orgánico)</div><button class="btn-report" onclick="genReport('${currentPage.id}')">📋 Generar Reporte para Codex</button></div>
+    <div class="chart-2col"><div class="card-box"><div class="card-hdr"><div class="card-title">🏆 Top 3 (orgánico)</div></div><div class="rank-posts">${rankHtml(top3,'var(--green)')||'Sin datos comparables'}</div></div>${bottomPanel}</div>
+    <div class="card-box"><div class="card-hdr"><div class="card-title">Resumen</div></div><div class="stats-grid">
+      <div class="sc"><div class="sc-lbl">ER Orgánico comparable</div><div class="sc-val ye">${ranked.length?avg(ranked.map(row=>row.er)).toFixed(2)+'%':'—'}</div><div class="sc-sub">${ranked.length} incluidos · ${excluded.length} excluidos</div></div>
+      <div class="sc trend-card"><div class="sc-lbl">Tendencia por red</div>${trendHtml('📘 FB',trendFor('FB'),'var(--fb)')}${trendHtml('📸 IG',trendFor('IG'),'var(--ig)')}</div>
+      <div class="sc"><div class="sc-lbl">Mejor día</div><div class="sc-val bl">${DAYS[bestDay]}</div></div>
+      <div class="sc"><div class="sc-lbl">Posts orgánicos</div><div class="sc-val pu">${org.length}/${posts.length}</div></div>
+    </div></div>
+    <details class="card-box analysis-excluded"><summary>Sin datos suficientes (${excluded.length})</summary><p>Estas publicaciones no tienen alcance real ni un snapshot de seguidores guardado en una fecha igual o anterior a su publicación, por lo que se excluyen del ranking para no estimarlas con seguidores actuales.</p>${excluded.length?`<ul>${excludedHtml}</ul>`:'<div class="analysis-note">Todas las publicaciones orgánicas tienen una base válida.</div>'}</details>`;
 }
 
 // ════════ COMPARE PAGES ════════

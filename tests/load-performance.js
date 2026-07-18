@@ -34,6 +34,8 @@ for(const file of ['assets/js/state.js','assets/js/utils.js','assets/js/meta-api
     };
     enrichFBPosts=async posts=>{await new Promise(resolve=>setTimeout(resolve,70));posts.forEach(p=>p._reach=10);return {fb:['post_media_view'],fbVideo:[]};};
     enrichIGPosts=async posts=>{await new Promise(resolve=>setTimeout(resolve,70));posts.forEach(p=>p._reach=20);return {igPhoto:['reach'],igVideo:[]};};
+    fetchPageFollowerHistory=async()=>[{date:'2026-01-02',value:2,source:'meta',metric:'page_daily_follows'}];
+    fetchInstagramFollowerHistory=async()=>({rows:[{date:'2026-07-02',value:1,source:'meta',metric:'follower_count'}],windowDays:30,year:2026});
   `,context);
 
   const started=Date.now();
@@ -46,6 +48,10 @@ for(const file of ['assets/js/state.js','assets/js/utils.js','assets/js/meta-api
   assert(context.__progress[0].time-started<80,'La vista básica debe aparecer antes de terminar los insights');
   assert.equal(vm.runInContext("cache['page-1'].metricsLoading",context),false);
   assert.equal(vm.runInContext("cache['page-1'].posts.length",context),2);
+  assert.equal(vm.runInContext("cache['page-1'].followerHistory.fb[0].value",context),2);
+  assert.equal(vm.runInContext("cache['page-1'].followerHistory.ig.rows[0].value",context),1);
+  assert.equal(vm.runInContext("cache['page-1'].followerHistory.ig.windowDays",context),30);
+  assert.equal(vm.runInContext("cache['page-1'].followerHistory.loaded",context),true);
 
   console.log('Load performance test OK: redes paralelas y render progresivo.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
