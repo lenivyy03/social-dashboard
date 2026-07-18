@@ -75,7 +75,9 @@ function platTotalsTable(data){
 }
 
 function growthYearControl(pageId){
-  const years=[...new Set((LS.snaps[pageId]||[]).map(s=>s.date.slice(0,4)))].sort().reverse();
+  const snapshotYears=(LS.snaps[pageId]||[]).map(s=>s.date.slice(0,4));
+  const metaYears=(cache[pageId]?.followerHistory?.fb||[]).map(s=>s.date.slice(0,4));
+  const years=[...new Set([...snapshotYears,...metaYears])].sort().reverse();
   if(!years.length) years.push(String(new Date().getFullYear()));
   if(!growthYear||!years.includes(String(growthYear))) growthYear=years[0];
   return `<label class="period-control compact"><span>Año</span>
@@ -87,16 +89,40 @@ function growthYearControl(pageId){
 
 function setGrowthYear(year){ growthYear=String(year); drawGrowth(currentPage.id); }
 
+function buildAnnualFollowerSeries(rows,year,now=new Date()){
+  const y=Number(year),currentYear=now.getFullYear();
+  const end=y===currentYear?new Date(Date.UTC(y,now.getMonth(),now.getDate())):new Date(Date.UTC(y,11,31));
+  const byDate=new Map(rows.filter(r=>String(r.date).startsWith(`${y}-`)).map(r=>[r.date,Number(r.value)||0]));
+  const series=[];
+  for(let day=new Date(Date.UTC(y,0,1));day<=end;day=new Date(day.getTime()+86400000)){
+    const date=day.toISOString().slice(0,10);
+    series.push({date,value:byDate.get(date)||0});
+  }
+  return series;
+}
+
 function drawGrowth(pageId){
   const allSnaps=LS.snaps[pageId]||[];
+  const metaHistory=cache[pageId]?.followerHistory?.fb||[];
   const area=document.getElementById('growthArea');
   if(!area) return;
-  const years=[...new Set(allSnaps.map(s=>s.date.slice(0,4)))].sort().reverse();
+  const years=[...new Set([...allSnaps.map(s=>s.date.slice(0,4)),...metaHistory.map(s=>s.date.slice(0,4))])].sort().reverse();
   if(!growthYear||!years.includes(String(growthYear))) growthYear=years[0]||String(new Date().getFullYear());
+  const metaRows=metaHistory.filter(s=>s.date.startsWith(String(growthYear)+'-'));
+  if(metaRows.length){
+    const series=buildAnnualFollowerSeries(metaRows,growthYear);
+    const gained=series.reduce((total,point)=>total+point.value,0);
+    const lastDate=series[series.length-1]?.date||`${growthYear}-01-01`;
+    area.innerHTML=`<div class="growth-summary"><span>1 ENE</span><strong class="positive">+${fmt(gained)} seguidores en ${growthYear}</strong><span>HASTA ${fmtDate(lastDate)}</span></div><div class="growth-source">Seguidores nuevos por día · Facebook · Fuente: Meta</div><canvas id="cGrowth"></canvas>`;
+    const c=document.getElementById('cGrowth');
+    const W=c.parentElement.clientWidth,H=180; setupCanvas(c,W,H);
+    lineChart(c.getContext('2d'),W,H,series.map(s=>s.value),series.map(s=>{const p=s.date.split('-');return `${p[2]}/${p[1]}`;}),'#1877F2',true);
+    return;
+  }
   const snaps=allSnaps.filter(s=>s.date.startsWith(String(growthYear)+'-')).sort((a,b)=>a.date.localeCompare(b.date));
   if(snaps.length<2){
     area.innerHTML=`<div style="padding:30px 10px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6">
-      📅 Aún no hay histórico suficiente en ${growthYear}.<br>El dashboard guarda los números cada día que lo abres.<br>
+      📅 Meta no entregó el histórico anual de seguidores para ${growthYear}.<br>El dashboard seguirá guardando el total cada día que lo abres.<br>
       <strong style="color:var(--text)">Snapshot de hoy guardado.</strong><br>Vuelve mañana para ver la primera línea de tendencia.</div>`;
     return;
   }

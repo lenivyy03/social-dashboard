@@ -46,7 +46,7 @@ async function savePageDataCache(pageId,data){
   const tx=db.transaction(PAGE_CACHE_STORE,'readwrite');
   tx.objectStore(PAGE_CACHE_STORE).put({
     pageId:String(pageId),savedAt:Date.now(),
-    data:{posts:data.posts,fans:data.fans||0,igFans:data.igFans||0,hasIG:!!data.hasIG,debug:data.debug||{fb:[],fbVideo:[],igPhoto:[],igVideo:[]},completeWindow:!data.paging?.fb&&!data.paging?.ig}
+    data:{posts:data.posts,fans:data.fans||0,igFans:data.igFans||0,hasIG:!!data.hasIG,debug:data.debug||{fb:[],fbVideo:[],igPhoto:[],igVideo:[]},followerHistory:data.followerHistory||{fb:[]},completeWindow:!data.paging?.fb&&!data.paging?.ig}
   });
   await transactionDone(tx); db.close();
 }
