@@ -18,6 +18,8 @@ let compareMonthB=null;           // segundo mes opcional de Comparar Posts
 let compareMetric='eng';           // métrica visible en las barras de Comparar Posts
 let compareChartOrder='chronological'; // chronological | desc | asc
 let growthYear=null;              // año visible en Crecimiento de Seguidores
+let labOutcomeMonth='',labOutcomePlatform='todos',labOutcomeSearch='';
+let labGoalNotice='';
 
 const COMPARE_CHART_METRICS={
   eng:{key:'_eng',label:'Engagement total',help:'Likes + comentarios + compartidos'},
@@ -46,7 +48,7 @@ const GOALS={
 // ── localStorage helpers ──
 const LS={
   paid:JSON.parse(localStorage.getItem('sd_paid')||'{}'),         // {postId:true}
-  snaps:JSON.parse(localStorage.getItem('sd_snaps')||'{}'),       // {pageId:[{date,fans,avgEng}]}
+  snaps:JSON.parse(localStorage.getItem('sd_snaps')||'{}'),       // {pageId:[{date,fans,igFans?,avgEng}]}
   pairs:JSON.parse(localStorage.getItem('sd_pairs')||'[]'),       // [{fb:postId, ig:postId}] piezas confirmadas como la misma
   rejected:JSON.parse(localStorage.getItem('sd_rejected')||'[]'), // ["fbId|igId"] sugerencias descartadas
   personas:JSON.parse(localStorage.getItem('sd_personas')||'{}'), // {pageId:[buyer persona]}

@@ -12,7 +12,8 @@ const context=vm.createContext({
 vm.runInContext(fs.readFileSync(path.join(root,'assets/js/charts.js'),'utf8'),context,{filename:'assets/js/charts.js'});
 vm.runInContext(`
   setupCanvas=()=>{};
-  barChartLabeled=(ctx,W,H,data,labels,color,paid,max)=>{globalThis.__chart={data,labels,max};};
+  platFilter='todos';
+  barChartLabeled=(ctx,W,H,data,labels,colors,paid,max,legend)=>{globalThis.__chart={data,labels,colors,max,legend};};
   globalThis.__posts=[
     {_dt:new Date('2026-06-18T12:00:00'),_plat:'FB',_likes:18,_paid:false},
     {_dt:new Date('2026-06-01T12:00:00'),_plat:'FB',_likes:1,_paid:false},
@@ -26,12 +27,14 @@ vm.runInContext(`
 `,context);
 
 assert.deepEqual(Array.from(context.__chart.data),[1,8,18]);
-assert.deepEqual(Array.from(context.__chart.labels),['01/06·F','08/06·I','18/06·F']);
+assert.deepEqual(Array.from(context.__chart.labels),['01/06','08/06','18/06']);
+assert.deepEqual(Array.from(context.__chart.colors),['#1877F2','#E1306C','#1877F2']);
+assert.equal(context.__chart.legend.platforms,true);
 assert.equal(context.__chart.max,25);
 
 vm.runInContext(`drawBars(__posts,'chart','_likes',25,'desc');`,context);
 assert.deepEqual(Array.from(context.__chart.data),[18,8,1]);
-assert.deepEqual(Array.from(context.__chart.labels),['18/06·F','08/06·I','01/06·F']);
+assert.deepEqual(Array.from(context.__chart.labels),['18/06','08/06','01/06']);
 vm.runInContext(`drawBars(__posts,'chart','_likes',25,'asc');`,context);
 assert.deepEqual(Array.from(context.__chart.data),[1,8,18]);
 console.log('Chart order test OK: cronológico, mayor a menor o menor a mayor.');
