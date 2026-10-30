@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Política de privacidad de Social Dashboard Lenivyy03, proyecto de Angel Ortega.">
+<title>Política de privacidad | Social Dashboard Lenivyy03</title>
+<style>:root{color-scheme:light;--ink:#171717;--paper:#f5f3ee;--accent:#ff3d00}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.7 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header,main,footer{width:min(880px,calc(100% - 40px));margin:auto}header{padding:28px 0;border-bottom:3px solid var(--ink)}.brand{font-weight:800;letter-spacing:.04em;text-decoration:none;color:var(--ink)}.brand span{color:var(--accent)}nav{display:flex;gap:22px;flex-wrap:wrap;margin-top:12px;font-size:15px}a{color:var(--ink);text-underline-offset:4px}a:hover{color:var(--accent)}a:focus-visible{outline:3px solid var(--accent);outline-offset:4px}main{padding:40px 0 60px}h1{font-size:clamp(30px,6vw,48px);line-height:1.1;letter-spacing:-.04em;margin:0 0 18px}h2{font-size:23px;line-height:1.3;margin:34px 0 12px}.meta{font-size:14px;color:#555}.notice{border:2px solid var(--ink);border-left:8px solid var(--accent);padding:18px 22px;background:white;margin:26px 0}li{margin:9px 0}code{overflow-wrap:anywhere}footer{border-top:3px solid var(--ink);padding:24px 0 36px;font-size:14px}p{margin:12px 0}ul,ol{padding-left:25px}@media(max-width:480px){header,main,footer{width:calc(100% - 32px)}main{padding-top:30px}.notice{padding:14px}}</style>
+</head>
+<body>
+<header>
+<a class="brand" href="./">social<span>.</span>dashboard</a>
+<nav aria-label="Navegación"><a href="./">Dashboard</a><a href="terms.html">Términos de servicio</a><a href="privacy.html">Política de privacidad</a></nav>
+</header>
+<main>
+<h1>Política de privacidad</h1>
+<p class="meta">Social Dashboard Lenivyy03 · Actualización: 30 de octubre de 2026</p>
+
+<div class="notice"><strong>Alcance actual.</strong> Este aviso describe la versión del dashboard que guarda información en el navegador. La integración de TikTok está en preparación para pruebas Sandbox. No existe todavía un servidor de este proyecto que reciba credenciales de TikTok o ejecute publicaciones.</div>
+<h2>1. Responsable y contacto</h2>
+<p>El responsable del proyecto Social Dashboard Lenivyy03 es Angel Ortega. Para dudas, acceso, corrección, eliminación u oposición al uso de datos que pudiera tener el responsable, inicia una solicitud en <a href="https://github.com/lenivyy03/social-dashboard/issues">GitHub Issues</a> pidiendo un canal privado. Los mensajes en ese sitio son públicos; no incluyas datos personales, tokens ni documentos en ellos. Para datos guardados únicamente en tu navegador, sigue también las instrucciones de eliminación de esta página.</p>
+<h2>2. Datos que utiliza el dashboard</h2>
+<ul>
+<li><strong>Conexión con Meta:</strong> el token de acceso que introduces, identificadores y nombres de páginas, cuenta profesional de Instagram vinculada y datos accesibles con tus permisos.</li>
+<li><strong>Contenido y estadísticas:</strong> textos, fechas, identificadores, imágenes de referencia y métricas de publicaciones, seguidores e interacciones que devuelve Meta.</li>
+<li><strong>Información que capturas:</strong> perfiles de audiencia, borradores, objetivos, vínculos entre publicaciones y cifras de gasto, mensajes, prospectos, ventas e ingresos. Estos campos están destinados a planificación y cifras agregadas, no a expedientes de personas.</li>
+<li><strong>Archivos y exportaciones:</strong> el laboratorio actual guarda el nombre del archivo de referencia; no lo sube a un servidor. Los reportes y respaldos que descargas quedan bajo tu control.</li>
+</ul>
+<h2>3. Finalidades</h2>
+<p>La información se utiliza para consultar estadísticas de cuentas autorizadas, comparar contenido, conservar históricos, preparar ideas y generar reportes. El código actual no incorpora un modelo de IA conectado: el texto para Codex se genera localmente. Si lo copias a un servicio de IA, revisa qué información incluyes y la política de ese proveedor.</p>
+<h2>4. Dónde se guarda y durante cuánto tiempo</h2>
+<p>El token de Meta y las preferencias, borradores y otros registros se guardan en <code>localStorage</code> del navegador. Los históricos y la caché de publicaciones se guardan en <code>IndexedDB</code>. Los registros locales permanecen hasta que los borres, el navegador elimine su almacenamiento o una función de la aplicación los reemplace. Algunos datos temporales se actualizan al cargar nuevas consultas.</p>
+<p>GitHub aloja el código y las páginas del sitio; el funcionamiento actual no envía automáticamente tus reportes o borradores al repositorio. Cualquier archivo que exportes seguirá existiendo donde lo hayas guardado hasta que lo elimines.</p>
+<h2>5. Proveedores y transferencias</h2>
+<p>Las solicitudes de estadísticas se envían a Meta con tu token. GitHub Pages sirve el sitio. El dashboard también solicita fuentes a Google Fonts y una biblioteca de exportación a jsDelivr. Al conectarse con ellos, esos proveedores pueden recibir datos técnicos como dirección IP, navegador y URL solicitada, y tratarlos conforme a sus propias políticas. Las páginas de términos y privacidad no cargan fuentes, bibliotecas ni scripts externos.</p>
+<p>El proyecto no incorpora publicidad ni herramientas propias de seguimiento comercial y no ofrece los datos a la venta. Revisa las políticas de <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a>, <a href="https://www.facebook.com/privacy/policy/">Meta</a>, <a href="https://policies.google.com/privacy">Google</a> y <a href="https://www.jsdelivr.com/terms/privacy-policy">jsDelivr</a> para conocer sus tratamientos independientes.</p>
+<h2>6. Pruebas previstas con TikTok</h2>
+<p>Configurar una aplicación en TikTok Developers no conecta por sí solo una cuenta al dashboard. Cuando la integración esté implementada, antes de autorizarla se informará de los permisos solicitados y del destino de los datos. Los permisos configurados para la prueba son <code>user.info.basic</code> (identificar la cuenta), <code>video.publish</code> (publicación directa) y <code>video.upload</code> (envío de borradores); solo se solicitarán los que necesite cada flujo.</p>
+<p>Antes de activar un servidor o almacenar tokens, videos o estados de envíos de TikTok, este aviso se actualizará para identificar el alojamiento, conservación, eliminación y medidas aplicables. Los archivos que decidas enviar a TikTok estarán también sujetos a su <a href="https://www.tiktok.com/legal/page/row/privacy-policy/en">política de privacidad</a> y a las restricciones de Sandbox. No se presenta esta versión como una integración aprobada para producción.</p>
+<h2>7. Cómo eliminar datos y revocar acceso</h2>
+<ol>
+<li>Para eliminar los datos locales, abre la configuración de tu navegador y borra todos los datos del sitio de este dashboard, incluidos el almacenamiento local e IndexedDB. Esto elimina también históricos y borradores locales; exporta antes lo que quieras conservar.</li>
+<li>Para impedir nuevas consultas a Meta, revoca la aplicación desde las opciones de aplicaciones o integraciones de tu cuenta de Meta. Borrar el navegador por sí solo no revoca un token.</li>
+<li>Si autorizas una prueba con TikTok, puedes retirar el acceso desde las opciones de aplicaciones conectadas de TikTok. La eliminación local o revocación no elimina archivos o publicaciones que ya estén en TikTok.</li>
+<li>Elimina por separado reportes y respaldos descargados y sus copias. Si compartiste datos con el responsable, solicita su acceso, corrección o eliminación mediante el canal indicado arriba.</li>
+</ol>
+<h2>8. Protección y cambios</h2>
+<p>El acceso al navegador y sus datos permite acceder a los registros guardados. Usa un dispositivo y perfil de navegador de confianza. Los tokens no deben publicarse en GitHub ni incluirse en reportes o capturas. La información de esta página se actualizará antes de introducir nuevos tratamientos o proveedores; la fecha de la última versión aparece al inicio.</p>
+
+</main>
+<footer>Responsable del proyecto: Angel Ortega · <a href="https://github.com/lenivyy03/social-dashboard/issues">Contacto y solicitudes</a></footer>
+</body>
+</html>
